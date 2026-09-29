@@ -22,8 +22,25 @@ Then open `http://localhost:4173`.
 - Distinguish government findings, official documents, independent datasets, media reports, and inference leads.
 - Correlation is a research lead, not a causal claim.
 
-## Planned source adapters
+## Ingestion adapters
 
-OpenHalalan, DPWH Transparency/eFOI, DA SIDLAN, COA eLibrary, and PhilGEPS.
+Implemented: OpenHalalan winners/vote counts, DPWH Transparency project API, and a DPWH eFOI evidence-document fetcher for explicit URLs.
+
+Still planned/documented: DA SIDLAN, COA eLibrary, and PhilGEPS.
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md), [ADAPTERS.md](./ADAPTERS.md), and [SOURCES.md](./SOURCES.md).
+
+
+## Source ingestion
+
+After PostgreSQL is provisioned and `DATABASE_URL` is configured:
+
+```bash
+node scripts/init-db.mjs
+BANTAYLINK_MAX_RECORDS=100 node scripts/ingest-source.mjs openhalalan-winners
+BANTAYLINK_MAX_RECORDS=100 node scripts/ingest-source.mjs dpwh-transparency
+```
+
+OpenHalalan resolves and records the exact repository commit used for an ingestion run. Large vote-count ingestion is stream-parsed; use `BANTAYLINK_MAX_RECORDS` for bounded tests.
+
+DPWH Transparency requests the public project API directly and does not attempt to bypass bot protection or rate limits.
