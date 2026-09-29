@@ -1,13 +1,14 @@
 import { ingestAdapter } from "../src/ingestion/engine.js";
 import { createPool, createPostgresStore } from "../src/db/postgres.js";
 import { openHalalanVotesAdapter, openHalalanWinnersAdapter } from "../src/adapters/openhalalan.js";
-import { dpwhTransparencyAdapter } from "../src/adapters/dpwh.js";
+import { dpwhProjectDetailAdapter, dpwhTransparencyAdapter } from "../src/adapters/dpwh.js";
 import { dpwhEfoiAdapter } from "../src/adapters/dpwh-efoi.js";
 
 const adapters = new Map([
   [openHalalanWinnersAdapter.id, openHalalanWinnersAdapter],
   [openHalalanVotesAdapter.id, openHalalanVotesAdapter],
   [dpwhTransparencyAdapter.id, dpwhTransparencyAdapter],
+  [dpwhProjectDetailAdapter.id, dpwhProjectDetailAdapter],
   [dpwhEfoiAdapter.id, dpwhEfoiAdapter]
 ]);
 
