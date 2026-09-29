@@ -43,6 +43,7 @@ export const dpwhEfoiAdapter = {
           html
         },
         url,
+        httpStatus: response.status,
         mimeType: response.headers.get("content-type") || "text/html"
       };
     }
