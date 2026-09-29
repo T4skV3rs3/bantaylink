@@ -206,6 +206,6 @@ export const dpwhProjectDetailAdapter = {
   },
 
   normalize(record, { contentHash }) {
-    return normalizeDpwhProject(record, { contentHash });
+    return normalizeDpwhProject(record, contentHash);
   }
 };
