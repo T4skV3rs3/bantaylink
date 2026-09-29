@@ -46,6 +46,8 @@ jobs:
           test -f src/adapters/openhalalan.js
           test -f src/adapters/dpwh.js
           test -f src/adapters/dpwh-efoi.js
+          test -f scripts/test-adapters.mjs
+          test -f scripts/ingest-source.mjs
 
       - name: Validate JSON
         run: |
