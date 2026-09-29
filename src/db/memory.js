@@ -56,10 +56,6 @@ export class MemoryStore {
   }
 
   async insertRawDocument(doc) {
-    const existing = [...this.rawDocuments.values()].find(
-      item => item.contentHash === doc.contentHash && item.sourceId === doc.sourceId
-    );
-    if (existing) return existing;
     this.rawDocuments.set(doc.id, doc);
     return doc;
   }
