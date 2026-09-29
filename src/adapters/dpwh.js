@@ -47,6 +47,7 @@ export function normalizeDpwhProject(record, contentHash) {
     category: stringOrNull(project.category),
     componentCategories: project.componentCategories ?? null,
     status: stringOrNull(project.status),
+    infraType: stringOrNull(project.infraType),
     budget: numberOrNull(project.budget),
     amountPaid: numberOrNull(project.amountPaid),
     progress: numberOrNull(project.progress),
@@ -58,6 +59,7 @@ export function normalizeDpwhProject(record, contentHash) {
     infraYear: stringOrNull(project.infraYear),
     contractEffectivityDate: stringOrNull(project.contractEffectivityDate),
     expiryDate: stringOrNull(project.expiryDate),
+    nysReason: stringOrNull(project.nysReason),
     programName: stringOrNull(project.programName),
     sourceOfFunds: stringOrNull(project.sourceOfFunds),
     isVerifiedByDpwh: project.isVerifiedByDpwh ?? null,
@@ -67,6 +69,15 @@ export function normalizeDpwhProject(record, contentHash) {
     livestreamVideoId: stringOrNull(project.livestreamVideoId),
     latitude: numberOrNull(project.latitude ?? project.location?.coordinates?.latitude),
     longitude: numberOrNull(project.longitude ?? project.location?.coordinates?.longitude),
+    coordinates: project.coordinates ?? null,
+    components: project.components ?? null,
+    winnerNames: project.winnerNames ?? null,
+    bidders: project.bidders ?? null,
+    procurement: project.procurement ?? null,
+    links: project.links ?? null,
+    imageSummary: project.imageSummary ?? null,
+    reportCount: numberOrNull(project.reportCount),
+    hasSatelliteImage: project.hasSatelliteImage ?? null,
     signals: sourceSignal(project.status)
   };
 
@@ -143,5 +154,58 @@ export const dpwhTransparencyAdapter = {
 
   normalize(record, { contentHash }) {
     return normalizeDpwhProject(record, contentHash);
+  }
+};
+
+
+export const dpwhProjectDetailAdapter = {
+  id: "dpwh-project-details",
+  name: "DPWH Transparency Contract Details",
+
+  source: {
+    id: "dpwh-transparency",
+    sourceKey: "dpwh-transparency-api",
+    name: "DPWH Transparency Portal",
+    sourceClass: "government_finding",
+    publisher: "Department of Public Works and Highways",
+    canonicalUrl: "https://transparency.dpwh.gov.ph/",
+    version: "live-api"
+  },
+
+  async *fetch({ maxRecords } = {}) {
+    const configured = String(process.env.DPWH_CONTRACT_IDS || "")
+      .split(",")
+      .map(value => value.trim())
+      .filter(Boolean);
+
+    if (!configured.length) {
+      throw new Error("DPWH_CONTRACT_IDS is required for dpwh-project-details.");
+    }
+
+    const limit = maxRecords ? Math.min(Number(maxRecords), configured.length) : configured.length;
+
+    for (const contractId of configured.slice(0, limit)) {
+      const url = `${API_BASE}/${encodeURIComponent(contractId)}`;
+      const response = await fetchResponse(url, {
+        headers: {
+          Origin: "https://transparency.dpwh.gov.ph",
+          Referer: "https://transparency.dpwh.gov.ph/",
+          Accept: "application/json, text/plain, */*"
+        }
+      });
+
+      const payload = await response.json();
+      const project = extractProject(payload);
+      yield {
+        payload: project,
+        url,
+        mimeType: "application/json",
+        contentHash: sha256(project)
+      };
+    }
+  },
+
+  normalize(record, { contentHash }) {
+    return normalizeDpwhProject(record, { contentHash });
   }
 };
