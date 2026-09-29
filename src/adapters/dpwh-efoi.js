@@ -37,9 +37,9 @@ export const dpwhEfoiAdapter = {
       yield {
         payload: {
           url,
-          title: extractFirst(html, /<title[^>]*>([sS]*?)</title>/i),
-          trackingNumber: extractFirst(html, /Tracking no:s*#?([A-Z0-9-]+)/i),
-          status: extractFirst(html, /(SUCCESSFUL|PROCESSING|ACCEPTED|DENIED|CLOSED)/i),
+          title: extractFirst(html, /<title[^>]*>([\s\S]*?)<\/title>/i),
+          trackingNumber: extractFirst(html, /Tracking no:\s*#?([A-Z0-9-]+)/i),
+          status: extractFirst(html, /\b(SUCCESSFUL|PROCESSING|ACCEPTED|DENIED|CLOSED)\b/i),
           html
         },
         url,
@@ -62,7 +62,7 @@ export const dpwhEfoiAdapter = {
     return {
       entities: [{
         entityType: "source",
-        canonicalKey: `dpwh-efoi:${id}`,
+        canonicalKey: \`dpwh-efoi:\${id}\`,
         label: document.title || id,
         data,
         observations: [{
