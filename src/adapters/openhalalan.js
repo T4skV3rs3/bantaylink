@@ -47,6 +47,14 @@ function stringOrNull(value) {
   return normalized || null;
 }
 
+function booleanFromCsv(value, defaultValue = null) {
+  if (value == null || value === "") return defaultValue;
+  const normalized = String(value).trim().toLowerCase();
+  if (["true", "1", "yes"].includes(normalized)) return true;
+  if (["false", "0", "no"].includes(normalized)) return false;
+  return defaultValue;
+}
+
 function winnerCanonicalKey(row) {
   const locality = [
     row.Year,
@@ -141,8 +149,8 @@ export function normalizeVote(row, contentHash) {
     votes: numberOrNull(row.votes),
     percentage: numberOrNull(row.percentage),
     rank: numberOrNull(row.rank),
-    isNationalRace: row.is_national_race === "true",
-    isGeographic: row.is_geographic !== "false",
+    isNationalRace: booleanFromCsv(row.is_national_race, false),
+    isGeographic: booleanFromCsv(row.is_geographic, true),
     sex: stringOrNull(row.sex),
     sexSource: stringOrNull(row.sex_source)
   };
