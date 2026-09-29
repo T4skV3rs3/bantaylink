@@ -1,0 +1,42 @@
+name: BantayLink Alpha Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required files
+        run: |
+          set -e
+          test -f index.html
+          test -f README.md
+          test -f ARCHITECTURE.md
+          test -f ADAPTERS.md
+          test -f SOURCES.md
+          test -f data/schema.json
+          test -f data/seed.json
+          test -f src/adapters/registry.js
+
+      - name: Validate JSON
+        run: |
+          python3 -m json.tool data/schema.json >/dev/null
+          python3 -m json.tool data/seed.json >/dev/null
+
+      - name: Smoke-check UI anchors
+        run: |
+          grep -q "Trace the record" index.html
+          grep -q "Infrastructure watch" index.html
+          grep -q "Political families" index.html
+          grep -q "Correlations" index.html
+          echo "BantayLink alpha smoke checks passed."
