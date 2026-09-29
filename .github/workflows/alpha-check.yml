@@ -16,6 +16,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
       - name: Validate required files
         run: |
           set -e
@@ -24,14 +33,23 @@ jobs:
           test -f ARCHITECTURE.md
           test -f ADAPTERS.md
           test -f SOURCES.md
+          test -f package.json
+          test -f db/schema.sql
           test -f data/schema.json
           test -f data/seed.json
           test -f src/adapters/registry.js
+          test -f src/ingestion/engine.js
+          test -f src/ingestion/hash.js
+          test -f src/db/memory.js
+          test -f src/db/postgres.js
 
       - name: Validate JSON
         run: |
           python3 -m json.tool data/schema.json >/dev/null
           python3 -m json.tool data/seed.json >/dev/null
+
+      - name: Test ingestion engine
+        run: npm run test:ingestion
 
       - name: Smoke-check UI anchors
         run: |
