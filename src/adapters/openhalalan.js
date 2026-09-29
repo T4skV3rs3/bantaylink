@@ -206,6 +206,7 @@ function buildAdapter(dataset) {
         yield {
           payload: row,
           url,
+          httpStatus: response.status,
           mimeType: config.path.endsWith(".gz") ? "application/gzip" : "text/csv",
           contentHash: sha256(row)
         };
