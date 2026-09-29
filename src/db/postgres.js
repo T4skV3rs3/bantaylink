@@ -94,8 +94,6 @@ export function createPostgresStore(pool) {
           (id, ingestion_run_id, source_id, canonical_url, retrieved_at, http_status,
            mime_type, content_hash, payload)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)
-         ON CONFLICT (source_id, content_hash) DO UPDATE
-           SET canonical_url=EXCLUDED.canonical_url
          RETURNING id, ingestion_run_id AS "ingestionRunId", source_id AS "sourceId",
                    canonical_url AS "canonicalUrl", retrieved_at AS "retrievedAt",
                    http_status AS "httpStatus", mime_type AS "mimeType",
