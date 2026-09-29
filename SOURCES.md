@@ -22,7 +22,7 @@ https://api.transparency.dpwh.gov.ph/projects
 Contract-detail API:
 https://api.transparency.dpwh.gov.ph/projects/{contractId}
 
-The published project surface includes fields such as contract ID, description, category, status, budget, progress, contractor, dates, location, funding/program information, and additional monitoring/procurement fields on detailed records.
+The published project surface includes fields such as contract ID, description, category, status, budget, progress, contractor, dates, location, funding/program information, and additional monitoring/procurement fields on detailed records. BantayLink also supports explicit contract-detail retrieval for selected IDs, including bidder/procurement records, source links, components, coordinates, and image metadata.
 
 BantayLink keeps DPWH status and progress values source-native and stores the retrieved payload as raw evidence. Status-derived signal tags such as `suspended` or `terminated` are exact-label mappings, not conclusions about conduct.
 
