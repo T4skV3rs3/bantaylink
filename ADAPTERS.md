@@ -31,6 +31,12 @@ Controls:
 - `DPWH_MAX_PAGES` (default 1000)
 - `maxRecords` can be passed to the ingestion engine for bounded test runs.
 
+Detail adapter:
+- `src/adapters/dpwh.js` also exposes `dpwh-project-details`.
+- Set `DPWH_CONTRACT_IDS` to a comma-separated list of contract IDs.
+- It calls `/projects/{contractId}` for those explicit IDs and retains detail fields such as bidders, procurement, links, components, coordinates, and image metadata.
+- It is intentionally bounded to supplied IDs rather than crawling every contract detail endpoint.
+
 The public API is currently subject to bot/rate-limit controls in some non-browser environments. The adapter fails loudly on non-2xx responses rather than attempting to bypass those controls. Use an approved first-party access path or wait for the source to permit the request.
 
 ## DPWH eFOI
