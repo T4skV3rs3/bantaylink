@@ -142,6 +142,7 @@ export const dpwhTransparencyAdapter = {
         yield {
           payload: project,
           url,
+          httpStatus: response.status,
           mimeType: "application/json",
           contentHash: sha256(project)
         };
@@ -199,6 +200,7 @@ export const dpwhProjectDetailAdapter = {
       yield {
         payload: project,
         url,
+        httpStatus: response.status,
         mimeType: "application/json",
         contentHash: sha256(project)
       };
