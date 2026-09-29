@@ -1,0 +1,14 @@
+{
+  "name": "bantaylink",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:ingestion": "node scripts/test-ingestion.mjs",
+    "ingest:seed": "node scripts/ingest-seed.mjs",
+    "db:init": "node scripts/init-db.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.16.3"
+  }
+}
