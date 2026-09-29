@@ -8,29 +8,36 @@ function requireField(value, name) {
 export async function ingestAdapter({ adapter, store, options = {} }) {
   requireField(adapter.id, "adapter.id");
   requireField(adapter.name, "adapter.name");
-  requireField(adapter.source?.sourceKey, "adapter.source.sourceKey");
-  requireField(adapter.source?.canonicalUrl, "adapter.source.canonicalUrl");
+
+  const sourceConfig = typeof adapter.getSource === "function"
+    ? await adapter.getSource(options)
+    : adapter.source;
+
+  requireField(sourceConfig?.sourceKey, "adapter.source.sourceKey");
+  requireField(sourceConfig?.canonicalUrl, "adapter.source.canonicalUrl");
 
   const source = await store.upsertSource({
-    id: adapter.source.id ?? randomUUID(),
-    sourceKey: adapter.source.sourceKey,
-    name: adapter.source.name ?? adapter.name,
-    sourceClass: adapter.source.sourceClass ?? "inference_lead",
-    publisher: adapter.source.publisher,
-    canonicalUrl: adapter.source.canonicalUrl
+    id: sourceConfig.id ?? randomUUID(),
+    sourceKey: sourceConfig.sourceKey,
+    name: sourceConfig.name ?? adapter.name,
+    sourceClass: sourceConfig.sourceClass ?? "inference_lead",
+    publisher: sourceConfig.publisher,
+    canonicalUrl: sourceConfig.canonicalUrl
   });
 
   const run = await store.startRun({
     id: randomUUID(),
     adapterId: adapter.id,
     sourceId: source.id,
-    sourceVersion: adapter.source.version ?? null
+    sourceVersion: sourceConfig.version ?? null
   });
 
   try {
     const rawRecords = await adapter.fetch({
       since: options.since,
-      cursor: options.cursor
+      cursor: options.cursor,
+      maxRecords: options.maxRecords,
+      source: sourceConfig
     });
 
     let seen = 0;
@@ -44,7 +51,7 @@ export async function ingestAdapter({ adapter, store, options = {} }) {
         id: raw?.rawDocumentId ?? randomUUID(),
         ingestionRunId: run.id,
         sourceId: source.id,
-        canonicalUrl: raw?.url ?? adapter.source.canonicalUrl,
+        canonicalUrl: raw?.url ?? sourceConfig.canonicalUrl,
         retrievedAt: raw?.retrievedAt ?? new Date().toISOString(),
         httpStatus: raw?.httpStatus ?? null,
         mimeType: raw?.mimeType ?? "application/json",
@@ -54,6 +61,7 @@ export async function ingestAdapter({ adapter, store, options = {} }) {
 
       const normalized = await adapter.normalize(rawPayload, {
         source,
+        sourceConfig,
         run,
         rawDocument,
         contentHash
