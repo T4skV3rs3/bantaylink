@@ -8,6 +8,7 @@
     "test:adapters": "node scripts/test-adapters.mjs",
     "test": "npm run test:ingestion && npm run test:adapters",
     "ingest:seed": "node scripts/ingest-seed.mjs",
+    "ingest:source": "node scripts/ingest-source.mjs",
     "db:init": "node scripts/init-db.mjs"
   },
   "dependencies": {
