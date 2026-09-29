@@ -1,0 +1,29 @@
+{
+  "record_types": [
+    "person",
+    "election_result",
+    "family_relationship",
+    "project",
+    "procurement_event",
+    "audit_finding",
+    "source",
+    "edge"
+  ],
+  "evidence_classes": [
+    "government_finding",
+    "official_document",
+    "independent_dataset",
+    "media_report",
+    "inference_lead"
+  ],
+  "edge_types": [
+    "served_in",
+    "related_to",
+    "located_in",
+    "procured_by",
+    "contracted_to",
+    "documented_by",
+    "overlaps_in_time",
+    "correlation_lead"
+  ]
+}
