@@ -41,6 +41,9 @@ CREATE TABLE IF NOT EXISTS raw_documents (
 CREATE INDEX IF NOT EXISTS idx_raw_documents_hash
   ON raw_documents(content_hash);
 
+CREATE UNIQUE INDEX IF NOT EXISTS ux_raw_documents_source_hash
+  ON raw_documents(source_id, content_hash);
+
 CREATE TABLE IF NOT EXISTS entities (
   id TEXT PRIMARY KEY,
   entity_type TEXT NOT NULL,
