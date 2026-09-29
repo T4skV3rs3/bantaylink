@@ -1,0 +1,107 @@
+{
+  "meta": {
+    "dataset": "BantayLink alpha seed",
+    "version": "0.1.0",
+    "note": "Small provenance-preserving seed; not a comprehensive database."
+  },
+  "records": [
+    {
+      "type": "project",
+      "id": "24GF0034",
+      "name": "Road infrastructure project 24GF0034",
+      "location": "Region VI",
+      "status": "Ongoing · 96.60% accomplished",
+      "agency": "DPWH",
+      "signal": "Status mismatch / monitoring lead",
+      "evidence": [
+        {
+          "class": "government_finding",
+          "title": "DPWH eFOI — Status of listed DPWH Project",
+          "date": "2025-08-11",
+          "url": "https://www.foi.gov.ph/agencies/dpwh/status-of-listed-dpwh-project/"
+        }
+      ]
+    },
+    {
+      "type": "project",
+      "id": "24G00023",
+      "name": "Road infrastructure project 24G00023",
+      "location": "Region VI",
+      "status": "Ongoing · 73.15% accomplished",
+      "agency": "DPWH",
+      "signal": "Progress record to verify",
+      "evidence": [
+        {
+          "class": "government_finding",
+          "title": "DPWH eFOI — Status of listed DPWH Project",
+          "date": "2025-08-11",
+          "url": "https://www.foi.gov.ph/agencies/dpwh/status-of-listed-dpwh-project/"
+        }
+      ]
+    },
+    {
+      "type": "project",
+      "id": "24NH0122",
+      "name": "National highway project 24NH0122",
+      "location": "Philippines",
+      "status": "Suspended",
+      "agency": "DPWH",
+      "signal": "Suspension record",
+      "evidence": [
+        {
+          "class": "government_finding",
+          "title": "DPWH eFOI — Project Status Clarification",
+          "date": "2026-08-04",
+          "url": "https://www.foi.gov.ph/agencies/dpwh/project-status-clarification/"
+        }
+      ]
+    },
+    {
+      "type": "project",
+      "id": "IB-01-001",
+      "name": "I-BUILD infrastructure subprojects",
+      "location": "Nationwide / DA regions",
+      "status": "API-backed dataset",
+      "agency": "DA SIDLAN",
+      "signal": "Machine-readable source",
+      "evidence": [
+        {
+          "class": "government_finding",
+          "title": "DA SIDLAN API — Infrastructure Subprojects Datasets",
+          "date": "2026-09-28",
+          "url": "https://sidlan.da.gov.ph/api/index"
+        }
+      ]
+    },
+    {
+      "type": "person",
+      "id": "election-record-entity",
+      "name": "Election record entity",
+      "office": "Governor / mayor / representative records",
+      "locality": "Philippines",
+      "family_note": "Family relationship requires evidence review",
+      "evidence": [
+        {
+          "class": "independent_dataset",
+          "title": "OpenHalalan winners dataset",
+          "url": "https://github.com/RobertRLeung/OpenHalalan"
+        }
+      ]
+    },
+    {
+      "type": "person",
+      "id": "candidate-record",
+      "name": "Candidate record",
+      "office": "National & local election history",
+      "locality": "Philippines",
+      "family_note": "Same-surname matching is only a lead, not proof of kinship",
+      "evidence": [
+        {
+          "class": "independent_dataset",
+          "title": "OpenHalalan vote counts + winners",
+          "url": "https://github.com/RobertRLeung/OpenHalalan"
+        }
+      ]
+    }
+  ]
+}
