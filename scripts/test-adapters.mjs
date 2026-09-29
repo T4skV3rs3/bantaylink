@@ -48,6 +48,7 @@ const project = normalizeDpwhProject({
   description: "TEST PROJECT",
   category: "Roads",
   status: "Suspended",
+  infraType: "Roads",
   budget: 1000,
   progress: 25,
   location: { region: "Region I" },
@@ -57,5 +58,6 @@ const project = normalizeDpwhProject({
 assert.equal(project.entities[0].entityType, "project");
 assert.equal(project.entities[0].canonicalKey, "dpwh-contract:25AA0001");
 assert.deepEqual(project.entities[0].data.signals, ["suspended"]);
+assert.equal(project.entities[0].data.infraType, "Roads");
 
 console.log("Adapter normalization checks passed.");
