@@ -39,16 +39,21 @@ jobs:
           test -f src/adapters/registry.js
           test -f src/ingestion/engine.js
           test -f src/ingestion/hash.js
+          test -f src/ingestion/csv.js
+          test -f src/ingestion/http.js
           test -f src/db/memory.js
           test -f src/db/postgres.js
+          test -f src/adapters/openhalalan.js
+          test -f src/adapters/dpwh.js
+          test -f src/adapters/dpwh-efoi.js
 
       - name: Validate JSON
         run: |
           python3 -m json.tool data/schema.json >/dev/null
           python3 -m json.tool data/seed.json >/dev/null
 
-      - name: Test ingestion engine
-        run: npm run test:ingestion
+      - name: Test ingestion engine and adapters
+        run: npm test
 
       - name: Smoke-check UI anchors
         run: |
