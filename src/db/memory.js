@@ -201,11 +201,94 @@ export class MemoryStore {
     return run;
   }
 
+  async getEntityResolutionSnapshot() {
+    const entities = [...this.entities.values()].filter(entity =>
+      entity.entityType !== "election_result" ||
+      entity.data?.dataset === "NLE_Winners_2004-2025" ||
+      entity.data?.dataset == null
+    );
+    const ids = new Set(entities.map(entity => entity.id));
+    return {
+      entities: entities.map(row => ({ ...row })),
+      observations: [...this.observations.values()].filter(row => ids.has(row.entityId)).map(row => ({ ...row })),
+      edges: [...this.edges.values()].filter(row => ids.has(row.fromEntityId) || ids.has(row.toEntityId)).map(row => ({ ...row }))
+    };
+  }
+
   async getCorrelationSnapshot() {
     return {
       entities: [...this.entities.values()].map(row => ({ ...row })),
       observations: [...this.observations.values()].map(row => ({ ...row })),
       edges: [...this.edges.values()].map(row => ({ ...row }))
+    };
+  }
+
+  async startEntityResolutionRun(input) {
+    const run = {
+      id: input.id,
+      engineVersion: input.engineVersion,
+      status: "running",
+      startedAt: new Date().toISOString(),
+      completedAt: null,
+      entityCount: 0,
+      candidateCount: 0,
+      autoConfirmedCount: 0,
+      reviewRequiredCount: 0,
+      conflictCount: 0,
+      errors: []
+    };
+    if (!this.entityResolutionRuns) this.entityResolutionRuns = new Map();
+    this.entityResolutionRuns.set(run.id, run);
+    return run;
+  }
+
+  async insertEntityResolutionCandidate(runId, candidate) {
+    if (!this.entityResolutionCandidates) this.entityResolutionCandidates = new Map();
+    const id = candidate.id || runId + ":" + candidate.fingerprint;
+    const row = { ...candidate, id, entityResolutionRunId: runId };
+    this.entityResolutionCandidates.set(id, row);
+    return row;
+  }
+
+  async completeEntityResolutionRun(id, patch) {
+    const run = this.entityResolutionRuns.get(id);
+    Object.assign(run, patch, { status: "completed", completedAt: new Date().toISOString() });
+    return run;
+  }
+
+  async failEntityResolutionRun(id, error) {
+    const run = this.entityResolutionRuns.get(id);
+    run.status = "failed";
+    run.completedAt = new Date().toISOString();
+    run.errors.push(String(error?.message ?? error));
+    return run;
+  }
+
+  async insertEntityResolutionAssertion(assertion) {
+    if (!this.entityResolutionAssertions) this.entityResolutionAssertions = [];
+    const row = {
+      ...assertion,
+      id: assertion.id || "assertion-" + this.entityResolutionAssertions.length + 1
+    };
+    this.entityResolutionAssertions.push(row);
+    return row;
+  }
+
+  async getEvidenceBundle({ observationIds = [], edgeIds = [] } = {}) {
+    const obsSet = new Set(observationIds);
+    const edgeSet = new Set(edgeIds);
+    const observations = [...this.observations.values()].filter(row => obsSet.has(row.id)).map(row => ({ ...row }));
+    const edges = [...this.edges.values()].filter(row => edgeSet.has(row.id)).map(row => ({ ...row }));
+    const sourceMap = new Map([...this.sources.values()].map(source => [source.id, source]));
+    for (const row of observations) {
+      const source = sourceMap.get(row.sourceId);
+      if (source) Object.assign(row, { sourceName: source.name, sourceClass: source.sourceClass, publisher: source.publisher, canonicalUrl: source.canonicalUrl });
+    }
+    return {
+      observations,
+      edges,
+      observationOccurrences: [...this.observationOccurrences.values()].filter(row => obsSet.has(row.observationId)).map(row => ({ ...row })),
+      edgeOccurrences: [...this.edgeOccurrences.values()].filter(row => edgeSet.has(row.edgeId)).map(row => ({ ...row }))
     };
   }
 
