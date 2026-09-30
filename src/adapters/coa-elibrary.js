@@ -1,4 +1,4 @@
-import { fetchResponse } from "../ingestion/http.js";
+import { fetchResponse, headersToObject } from "../ingestion/http.js";
 
 const DEFAULT_URLS = [];
 
