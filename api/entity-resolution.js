@@ -44,7 +44,8 @@ export default async function handler(req, res) {
         service: "bantaylink",
         status: "ok",
         run: null,
-        candidates: []
+        candidates: [],
+        clusters: []
       });
     }
 
