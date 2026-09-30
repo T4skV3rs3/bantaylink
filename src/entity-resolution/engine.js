@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { ENTITY_RESOLUTION_ENGINE_VERSION, resolveEntities } from "./rules.js";
+import {
+  ENTITY_RESOLUTION_ENGINE_VERSION,
+  resolveEntities,
+  buildAutoConfirmedClusters
+} from "./rules.js";
 
 export { ENTITY_RESOLUTION_ENGINE_VERSION };
 
@@ -18,6 +22,7 @@ export function runEntityResolution({ snapshot, maxCandidates } = {}) {
   const autoConfirmed = result.candidates.filter(item => item.status === "AUTO_CONFIRMED").length;
   const reviewRequired = result.candidates.filter(item => item.status === "REVIEW_REQUIRED").length;
   const conflicts = result.candidates.filter(item => item.status === "CONFLICT").length;
+  const clusters = buildAutoConfirmedClusters(result.candidates, snapshot.entities);
 
   return {
     run: {
@@ -31,11 +36,11 @@ export function runEntityResolution({ snapshot, maxCandidates } = {}) {
       autoConfirmedCount: autoConfirmed,
       reviewRequiredCount: reviewRequired,
       conflictCount: conflicts,
-      clusterCount: (result.clusters || []).length,
+      clusterCount: clusters.length,
       errors: []
     },
     candidates: result.candidates,
-    clusters: result.clusters || []
+    clusters
   };
 }
 
