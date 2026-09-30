@@ -64,7 +64,7 @@ function collectProjectYears(project) {
   const years = new Set();
 
   for (const value of [
-    data.infraYear,
+    toNumber(data.infraYear),
     toNumber(data.year),
     toNumber(data.projectYear),
     yearFromDate(data.startDate),
