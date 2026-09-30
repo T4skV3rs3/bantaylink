@@ -62,6 +62,11 @@ assert.equal(project.entities[0].entityType, "project");
 assert.equal(project.entities[0].canonicalKey, "dpwh-contract:25AA0001");
 assert.deepEqual(project.entities[0].data.signals, ["suspended"]);
 assert.equal(project.entities[0].data.infraType, "Roads");
+assert.equal(project.entities[0].data.pcabId, null);
+assert.equal(project.entities.length, 2);
+assert.equal(project.edges.length, 1);
+assert.equal(project.edges[0].edgeType, "contracted_to");
+assert.equal(project.entities[1].entityType, "contractor");
 
 const sidlan = normalizeSidlanIbuild({
   sp_id: "IB-123",
