@@ -120,3 +120,28 @@ Consumes the public project listing API page-by-page, preserves the source contr
 ### DPWH eFOI
 
 Ingests explicitly configured FOI response URLs as official documents. It does not infer wrongdoing or crawl the entire site.
+
+
+## Entity resolution v1.3
+
+Entity resolution is a derived layer over source-backed entities and observations. It creates:
+
+- per-entity identity records containing normalized identity context and evidence IDs;
+- deterministic candidate pairs with explicit statuses;
+- auto-confirmed clusters built only from typed stable identifiers;
+- immutable membership assertions that point back to supporting candidates and observations.
+
+Identity domains are explicit so a shared identifier is interpreted within its source-supported namespace. Person name similarity never auto-confirms identity. Organization/contractor records may cross-resolve when a supported typed identifier matches; conflicting identifiers remain conflicts. Project/project and project/procurement joins are review candidates, not merges.
+
+Project and procurement matching uses deterministic blocking rather than an all-pairs join. Runs record comparison counts and a truncation flag. A truncated run is not presented as a complete resolution pass.
+
+The resolver is deliberately separate from the source-backed edges table. Source-backed edges retain direct provenance; resolution candidates and assertions are derived artifacts.
+
+## Evidence UI
+
+The static dashboard exposes six research surfaces: Overview, Infrastructure, Political research, Correlations, Evidence, and Entity resolution.
+
+The Evidence surface traces an entity or derived finding through source class, canonical/retrieval URL, retrieval time, ingestion run, source record ID, normalized/raw hash metadata, repeat retrieval occurrences, source-backed relationships, and resolution candidates/assertions.
+
+The evidence API is read-only and returns safe metadata by default. Full raw document payloads are not exposed from the public evidence route. Source documents remain available through their canonical URLs where supplied by the source.
+
