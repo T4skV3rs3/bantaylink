@@ -330,12 +330,45 @@ export function createPostgresStore(pool) {
          VALUES ($1,$2,'running')
          RETURNING id, engine_version AS "engineVersion", status,
                    started_at AS "startedAt", completed_at AS "completedAt",
-                   entity_count AS "entityCount", candidate_count AS "candidateCount",
+                   entity_count AS "entityCount", identity_record_count AS "identityRecordCount",
+                   candidate_count AS "candidateCount",
                    auto_confirmed_count AS "autoConfirmedCount",
                    review_required_count AS "reviewRequiredCount",
                    conflict_count AS "conflictCount", cluster_count AS "clusterCount",
                    truncated, errors`,
         [input.id, input.engineVersion]
+      );
+      return result.rows[0];
+    },
+
+    async insertEntityResolutionIdentityRecord(runId, identity) {
+      const id = identity.id || (runId + ":" + identity.entityId);
+      const result = await pool.query(
+        \`INSERT INTO entity_resolution_identity_records
+          (id, entity_resolution_run_id, identity_type, entity_id, source_id,
+           source_record_id, identity_key, normalized_name, locality_key, external_id, data)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)
+         ON CONFLICT (entity_resolution_run_id, entity_id) DO UPDATE
+           SET identity_type=EXCLUDED.identity_type,
+               source_id=EXCLUDED.source_id,
+               source_record_id=EXCLUDED.source_record_id,
+               identity_key=EXCLUDED.identity_key,
+               normalized_name=EXCLUDED.normalized_name,
+               locality_key=EXCLUDED.locality_key,
+               external_id=EXCLUDED.external_id,
+               data=EXCLUDED.data
+         RETURNING id, entity_resolution_run_id AS "entityResolutionRunId",
+                   identity_type AS "identityType", entity_id AS "entityId",
+                   source_id AS "sourceId", source_record_id AS "sourceRecordId",
+                   identity_key AS "identityKey", normalized_name AS "normalizedName",
+                   locality_key AS "localityKey", external_id AS "externalId",
+                   data, created_at AS "createdAt"\`,
+        [
+          id, runId, identity.identityType, identity.entityId, identity.sourceId ?? null,
+          identity.sourceRecordId, identity.identityKey ?? null, identity.normalizedName ?? null,
+          identity.localityKey ?? null, identity.externalId ?? null,
+          JSON.stringify(identity.data ?? {})
+        ]
       );
       return result.rows[0];
     },
@@ -375,22 +408,25 @@ export function createPostgresStore(pool) {
       const result = await pool.query(
         `UPDATE entity_resolution_runs
          SET status='completed', completed_at=NOW(),
-             entity_count=$2, candidate_count=$3,
-             auto_confirmed_count=$4, review_required_count=$5,
-             conflict_count=$6, cluster_count=$7, truncated=$8, errors=$9::jsonb
+             entity_count=$2, identity_record_count=$3, candidate_count=$4,
+             auto_confirmed_count=$5, review_required_count=$6,
+             conflict_count=$7, cluster_count=$8, truncated=$9,
+             comparison_count=$10, errors=$11::jsonb
          WHERE id=$1
          RETURNING id, engine_version AS "engineVersion", status,
                    started_at AS "startedAt", completed_at AS "completedAt",
-                   entity_count AS "entityCount", candidate_count AS "candidateCount",
+                   entity_count AS "entityCount", identity_record_count AS "identityRecordCount",
+                   candidate_count AS "candidateCount",
                    auto_confirmed_count AS "autoConfirmedCount",
                    review_required_count AS "reviewRequiredCount",
                    conflict_count AS "conflictCount",
                    cluster_count AS "clusterCount",
                    truncated, errors`,
         [
-          id, patch.entityCount, patch.candidateCount,
+          id, patch.entityCount, patch.identityRecordCount ?? 0, patch.candidateCount,
           patch.autoConfirmedCount, patch.reviewRequiredCount,
-          patch.conflictCount, patch.clusterCount ?? 0, Boolean(patch.truncated), JSON.stringify(patch.errors ?? [])
+          patch.conflictCount, patch.clusterCount ?? 0, Boolean(patch.truncated),
+          patch.comparisonCount ?? 0, JSON.stringify(patch.errors ?? [])
         ]
       );
       return result.rows[0];
@@ -407,7 +443,9 @@ export function createPostgresStore(pool) {
                    entity_count AS "entityCount", candidate_count AS "candidateCount",
                    auto_confirmed_count AS "autoConfirmedCount",
                    review_required_count AS "reviewRequiredCount",
-                   conflict_count AS "conflictCount", errors`,
+                   conflict_count AS "conflictCount",
+                   cluster_count AS "clusterCount",
+                   truncated, comparison_count AS "comparisonCount", errors`,
         [id, JSON.stringify([{ stage: "run", message: String(error?.message ?? error), at: new Date().toISOString() }])]
       );
       return result.rows[0];
