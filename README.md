@@ -44,9 +44,9 @@ Use \`BANTAYLINK_MAX_RESOLUTION_CANDIDATES\` to bound a run for testing.
 
 The web UI includes **Entity resolution**, **Correlations**, and **Evidence trail** views. The evidence view is backed by \`/api/evidence\` and exposes the entity, observations, raw retrieval metadata, hashes, repeat-run occurrence counts, and source-backed edges that sit beneath a selected record or finding.
 
-# Correlation engine v0.5
+# Correlation engine v0.6
 
-The v0.5 correlation engine produces source-referenced findings without mutating source-backed edges. It detects project status histories, multi-source project observations, contractor project portfolios, and election/project jurisdiction-year intersections. Intersections are labeled `INFERENCE_LEAD`; the engine does not infer causation, misconduct, or political relationships.
+The v0.6 correlation engine produces source-referenced findings without mutating source-backed edges. It detects project status histories, multi-source project observations, source-value divergence, exact project/procurement identifier links, contractor portfolios, and election/project jurisdiction-year intersections. Election intersections remain `INFERENCE_LEAD`; the engine does not infer causation, misconduct, or political relationships.
 
 Run the engine after the provenance database is initialized and populated:
 
