@@ -79,3 +79,13 @@ After additional source research and entity-resolution validation, v1 should add
 - UI traceability from every finding to the underlying documents.
 
 v1 should remain evidence-explanatory rather than turning the engine into a political judgment system.
+
+
+## Read API
+
+The read-only Vercel endpoint `/api/correlations` returns the latest completed correlation run and up to 250 findings. Optional query parameters:
+- `limit`
+- `rule`
+- `status`
+
+The endpoint is read-only and requires `DATABASE_URL`.
