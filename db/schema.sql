@@ -73,10 +73,6 @@ ALTER TABLE raw_documents
 ALTER TABLE raw_documents
   ADD COLUMN IF NOT EXISTS hash_scope TEXT NOT NULL DEFAULT 'canonical_payload';
 
-UPDATE raw_documents
-SET retrieval_url = COALESCE(retrieval_url, canonical_url)
-WHERE retrieval_url IS NULL;
-
 CREATE TABLE IF NOT EXISTS entities (
   id TEXT PRIMARY KEY,
   entity_type TEXT NOT NULL,
