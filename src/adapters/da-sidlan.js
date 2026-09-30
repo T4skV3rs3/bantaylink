@@ -1,4 +1,4 @@
-import { fetchResponse } from "../ingestion/http.js";
+import { fetchResponse, headersToObject, redactUrl } from "../ingestion/http.js";
 import { sha256 } from "../ingestion/hash.js";
 
 const API_BASE = "https://sidlan.da.gov.ph/api/ibuild";
