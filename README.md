@@ -31,6 +31,18 @@ Still planned/documented: DA SIDLAN, COA eLibrary, and PhilGEPS.
 See [ARCHITECTURE.md](./ARCHITECTURE.md), [ADAPTERS.md](./ADAPTERS.md), and [SOURCES.md](./SOURCES.md).
 
 
+## Correlation engine v0.5
+
+The v0.5 correlation engine produces source-referenced findings without mutating source-backed edges. It detects project status histories, multi-source project observations, contractor project portfolios, and election/project jurisdiction-year intersections. Intersections are labeled \`INFERENCE_LEAD\`; the engine does not infer causation, misconduct, or political relationships.
+
+Run the engine after the provenance database is initialized and populated:
+
+\`\`\`bash
+npm run correlate
+\`\`\`
+
+Use \`BANTAYLINK_MAX_FINDINGS\` to bound a run for testing.
+
 ## Source ingestion
 
 After PostgreSQL is provisioned and `DATABASE_URL` is configured:
