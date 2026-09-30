@@ -25,6 +25,7 @@
     "contracted_to",
     "documented_by",
     "overlaps_in_time",
-    "correlation_lead"
+    "correlation_lead",
+    "awarded_to"
   ]
 }
