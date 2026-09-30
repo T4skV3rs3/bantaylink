@@ -28,7 +28,11 @@ export function normalizeSnapshot(snapshot) {
 export function runCorrelation({ snapshot, maxFindings } = {}) {
   const normalizedSnapshot = normalizeSnapshot(snapshot);
   const startedAt = new Date().toISOString();
-  const findings = runCorrelationRules(normalizedSnapshot);
+  const findings = runCorrelationRules(normalizedSnapshot)
+    .sort((a, b) =>
+      String(a.findingType).localeCompare(String(b.findingType)) ||
+      String(a.fingerprint).localeCompare(String(b.fingerprint))
+    );
 
   const limit = normalizeMaxFindings(maxFindings);
 
@@ -45,6 +49,7 @@ export function runCorrelation({ snapshot, maxFindings } = {}) {
       observationCount: normalizedSnapshot.observations.length,
       edgeCount: normalizedSnapshot.edges.length,
       findingCount: limitedFindings.length,
+      truncated: limit != null && findings.length > limitedFindings.length,
       errors: []
     },
     findings: limitedFindings
@@ -80,6 +85,7 @@ export async function executeCorrelationRun({ store, maxFindings } = {}) {
       observationCount: result.run.observationCount,
       edgeCount: result.run.edgeCount,
       findingCount: result.findings.length,
+      truncated: result.run.truncated,
       errors: []
     });
   } catch (error) {
