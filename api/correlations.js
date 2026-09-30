@@ -14,10 +14,10 @@ export default async function handler(req, res) {
     });
   }
 
-  const limit = Math.min(
-    Math.max(Number(req.query?.limit || 50), 1),
-    250
-  );
+  const parsedLimit = Number(req.query?.limit);
+  const limit = Number.isFinite(parsedLimit)
+    ? Math.min(Math.max(Math.floor(parsedLimit), 1), 250)
+    : 50;
   const ruleId = req.query?.rule ? String(req.query.rule) : null;
   const status = req.query?.status ? String(req.query.status) : null;
 
