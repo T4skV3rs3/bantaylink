@@ -1,6 +1,6 @@
 # BantayLink correlation engine
 
-## Version 0.5 scope
+## Version 0.6 scope
 
 The correlation engine is a deterministic, derived layer over the provenance graph. It never rewrites source-backed observations or edges.
 
@@ -13,6 +13,18 @@ Detects a canonical project with multiple observations whose published status an
 `MULTI_SOURCE_PROJECT`
 
 Detects a canonical project observed by multiple source records. The rule deliberately does not decide whether those sources are independent.
+
+`SOURCE_STATUS_DIVERGENCE`
+
+Compares the latest ingested observation from each contributing source for a canonical project. It flags differing published status and/or progress values as a source-value divergence. It does not choose which source is correct or infer why the values differ.
+
+`PROJECT_PROCUREMENT_LINK`
+
+Links a project to an eligible PhilGEPS procurement event when the normalized project contract ID exactly equals the procurement reference number. The rule excludes explicit bid-notice events and requires procurement evidence consistent with an award/contract record. It is a verified identifier relationship, not a conclusion about legality or performance.
+
+`PROJECT_PROCUREMENT_CONTRACTOR_CONFLICT`
+
+For an exact project/procurement identifier link, records a conflict when both records publish non-empty PCAB identifiers and they differ. This is a source-record contradiction; it does not decide which identifier is correct.
 
 `CONTRACTOR_PORTFOLIO`
 
@@ -28,6 +40,10 @@ This is an `INFERENCE_LEAD` because an election/jurisdiction overlap does not es
 
 Adds the named project contractor to the preceding intersection. It remains an `INFERENCE_LEAD` and explicitly limits the interpretation.
 
+## Explainable joins
+
+The procurement link payload includes the exact identifier join basis and any directly related source-backed edges, such as `project → contractor` or `procurement_event → contractor`. Derived joins are explicitly labeled separately from source-backed edges. This keeps multi-hop explanations from being mistaken for source facts.
+
 ## Deliberate exclusions
 
 The v0.5 engine does not:
@@ -35,6 +51,9 @@ The v0.5 engine does not:
 - merge people across election records;
 - treat OpenHalalan vote-count rows as winner/person records for election/project joins;
 - infer office tenure from election year alone;
+- treat procurement reference-number equality as proof of award compliance, project performance, payment correctness, or misconduct;
+- choose a “correct” source when current project observations diverge;
+- infer contractor identity from name equality when explicit stable identifiers conflict;
 - infer conflicts of interest, favoritism, corruption, illegality, or causation;
 - persist derived findings as source-backed `edges`.
 
@@ -83,7 +102,7 @@ v1 should remain evidence-explanatory rather than turning the engine into a poli
 
 ## Read API
 
-The read-only Vercel endpoint `/api/correlations` returns the latest completed correlation run and up to 250 findings. Optional query parameters:
+The read-only Vercel endpoint `/api/correlations` returns the latest completed correlation run and up to 250 findings. The run now includes `truncated`, so bounded correlation output is explicitly marked as partial. Optional query parameters:
 - `limit`
 - `rule`
 - `status`
