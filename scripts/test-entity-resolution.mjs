@@ -261,5 +261,7 @@ assert.equal(store.entityResolutionClusters.size, first.clusters.length);
 
 const reduced = resolveEntities(snapshot, { maxCandidates: 2 });
 assert.equal(reduced.candidates.length, 2);
+assert.equal(reduced.truncated, true);
+assert.equal(first.run.truncated, false);
 
 console.log("Entity-resolution engine v1.1 tests passed.");
