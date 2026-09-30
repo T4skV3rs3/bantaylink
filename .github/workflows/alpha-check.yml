@@ -91,6 +91,16 @@ jobs:
           node --check scripts/run-correlation.mjs
           node --check api/correlations.js
 
+      - name: Syntax-check browser UI script
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          html = Path("index.html").read_text()
+          script = html.split("<script>", 1)[1].split("</script>", 1)[0]
+          Path("/tmp/bantaylink-index.js").write_text(script)
+          PY
+          node --check /tmp/bantaylink-index.js
+
       - name: Validate JSON
         run: |
           python3 -m json.tool data/schema.json >/dev/null
