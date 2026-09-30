@@ -539,7 +539,7 @@ export function createPostgresStore(pool) {
     },
 
     async getCorrelationSnapshot() {
-      const entities = await pool.query(
+      const baseResult = await pool.query(
         `SELECT id, entity_type AS "entityType", canonical_key AS "canonicalKey",
                 label, data, first_seen_at AS "firstSeenAt", last_seen_at AS "lastSeenAt"
          FROM entities
@@ -549,41 +549,76 @@ export function createPostgresStore(pool) {
                      OR data->>'dataset' IS NULL))`
       );
 
-      const entityIds = entities.rows.map(row => row.id);
-      const [observations, edges] = await Promise.all([
-        entityIds.length
-          ? pool.query(
-              `SELECT id, entity_id AS "entityId", source_id AS "sourceId",
-                      ingestion_run_id AS "ingestionRunId", raw_document_id AS "rawDocumentId",
-                      record_type AS "recordType", source_record_id AS "sourceRecordId",
-                      observed_at AS "observedAt", content_hash AS "contentHash", data
-               FROM observations
-               WHERE entity_id = ANY($1::text[])`,
-              [entityIds]
-            )
-          : { rows: [] },
-        entityIds.length
-          ? pool.query(
-              `SELECT id, from_entity_id AS "fromEntityId", to_entity_id AS "toEntityId",
-                      edge_type AS "edgeType", source_id AS "sourceId",
-                      ingestion_run_id AS "ingestionRunId", raw_document_id AS "rawDocumentId",
-                      source_record_id AS "sourceRecordId", observed_at AS "observedAt",
-                      content_hash AS "contentHash", data
-               FROM edges
-               WHERE from_entity_id = ANY($1::text[])
-                  OR to_entity_id = ANY($1::text[])`,
-              [entityIds]
-            )
-          : { rows: [] }
-      ]);
+      const projectContractIds = [...new Set(
+        baseResult.rows
+          .filter(row => row.entityType === "project")
+          .map(row => String(row.data?.contractId ?? "").trim().toUpperCase())
+          .filter(Boolean)
+      )];
+
+      const procurementResult = projectContractIds.length
+        ? await pool.query(
+            `SELECT id, entity_type AS "entityType", canonical_key AS "canonicalKey",
+                    label, data, first_seen_at AS "firstSeenAt", last_seen_at AS "lastSeenAt"
+             FROM entities
+             WHERE entity_type='procurement_event'
+               AND UPPER(regexp_replace(COALESCE(data->>'referenceNumber',''), '\\s+', ' ', 'g')) = ANY($1::text[])`,
+            [projectContractIds]
+          )
+        : { rows: [] };
+
+      const initialEntities = [...baseResult.rows, ...procurementResult.rows];
+      const initialIds = [...new Set(initialEntities.map(row => row.id))];
+
+      const observations = initialIds.length
+        ? await pool.query(
+            `SELECT id, entity_id AS "entityId", source_id AS "sourceId",
+                    ingestion_run_id AS "ingestionRunId", raw_document_id AS "rawDocumentId",
+                    record_type AS "recordType", source_record_id AS "sourceRecordId",
+                    observed_at AS "observedAt", content_hash AS "contentHash", data
+             FROM observations
+             WHERE entity_id = ANY($1::text[])`,
+            [initialIds]
+          )
+        : { rows: [] };
+
+      const edgeResult = initialIds.length
+        ? await pool.query(
+            `SELECT id, from_entity_id AS "fromEntityId", to_entity_id AS "toEntityId",
+                    edge_type AS "edgeType", source_id AS "sourceId",
+                    ingestion_run_id AS "ingestionRunId", raw_document_id AS "rawDocumentId",
+                    source_record_id AS "sourceRecordId", observed_at AS "observedAt",
+                    content_hash AS "contentHash", data
+             FROM edges
+             WHERE from_entity_id = ANY($1::text[])
+                OR to_entity_id = ANY($1::text[])`,
+            [initialIds]
+          )
+        : { rows: [] };
+
+      const relatedIds = [...new Set([
+        ...initialIds,
+        ...edgeResult.rows.flatMap(row => [row.fromEntityId, row.toEntityId]).filter(Boolean)
+      ])];
+
+      const relatedEntityResult = relatedIds.length
+        ? await pool.query(
+            `SELECT id, entity_type AS "entityType", canonical_key AS "canonicalKey",
+                    label, data, first_seen_at AS "firstSeenAt", last_seen_at AS "lastSeenAt"
+             FROM entities
+             WHERE id = ANY($1::text[])`,
+            [relatedIds]
+          )
+        : { rows: [] };
+
+      const entityById = new Map(relatedEntityResult.rows.map(row => [row.id, row]));
 
       return {
-        entities: entities.rows,
+        entities: [...entityById.values()],
         observations: observations.rows,
-        edges: edges.rows
+        edges: edgeResult.rows
       };
-    },
-
+    }
     async startCorrelationRun(input) {
       const result = await pool.query(
         `INSERT INTO correlation_runs (id, engine_version, status)
