@@ -6,27 +6,27 @@ The correlation engine is a deterministic, derived layer over the provenance gra
 
 ### Rules
 
-\`STATUS_HISTORY\`
+`STATUS_HISTORY`
 
 Detects a canonical project with multiple observations whose published status and/or progress differs. This is a verified statement about the records; it does not assert why the values differ.
 
-\`MULTI_SOURCE_PROJECT\`
+`MULTI_SOURCE_PROJECT`
 
 Detects a canonical project observed by multiple source records. The rule deliberately does not decide whether those sources are independent.
 
-\`CONTRACTOR_PORTFOLIO\`
+`CONTRACTOR_PORTFOLIO`
 
 Groups projects only when a contractor identity key is available through a PCAB identifier or otherwise a normalized contractor name. This is a documented project portfolio pattern, not a political conclusion.
 
-\`ELECTION_PROJECT_OVERLAP\`
+`ELECTION_PROJECT_OVERLAP`
 
 Joins election-winner records to projects when the office level matches the project jurisdiction and the recorded project year matches the election year. Municipal offices join on city/municipality; provincial offices join on province.
 
-This is an \`INFERENCE_LEAD\` because an election/jurisdiction overlap does not establish project control, participation, influence, favoritism, conflict of interest, or causation.
+This is an `INFERENCE_LEAD` because an election/jurisdiction overlap does not establish project control, participation, influence, favoritism, conflict of interest, or causation.
 
-\`ELECTION_PROJECT_CONTRACTOR_INTERSECTION\`
+`ELECTION_PROJECT_CONTRACTOR_INTERSECTION`
 
-Adds the named project contractor to the preceding intersection. It remains an \`INFERENCE_LEAD\` and explicitly limits the interpretation.
+Adds the named project contractor to the preceding intersection. It remains an `INFERENCE_LEAD` and explicitly limits the interpretation.
 
 ## Deliberate exclusions
 
@@ -36,13 +36,13 @@ The v0.5 engine does not:
 - treat OpenHalalan vote-count rows as winner/person records for election/project joins;
 - infer office tenure from election year alone;
 - infer conflicts of interest, favoritism, corruption, illegality, or causation;
-- persist derived findings as source-backed \`edges\`.
+- persist derived findings as source-backed `edges`.
 
 ## Finding storage
 
 Derived findings live in:
-- \`correlation_runs\`
-- \`correlation_findings\`
+- `correlation_runs`
+- `correlation_findings`
 
 Each finding stores:
 - correlation rule ID;
