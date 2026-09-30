@@ -68,7 +68,7 @@ export const dpwhEfoiAdapter = {
     return {
       entities: [{
         entityType: "source",
-        canonicalKey: \`dpwh-efoi:\${id}\`,
+        canonicalKey: `dpwh-efoi:${id}`,
         label: document.title || id,
         data,
         observations: [{
