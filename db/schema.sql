@@ -245,3 +245,85 @@ CREATE INDEX IF NOT EXISTS idx_correlation_findings_rule
 
 CREATE INDEX IF NOT EXISTS idx_correlation_findings_subject
   ON correlation_findings(subject_entity_id);
+
+
+CREATE TABLE IF NOT EXISTS entity_resolution_runs (
+  id TEXT PRIMARY KEY,
+  engine_version TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('running','completed','failed')),
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  entity_count INTEGER NOT NULL DEFAULT 0,
+  candidate_count INTEGER NOT NULL DEFAULT 0,
+  auto_confirmed_count INTEGER NOT NULL DEFAULT 0,
+  review_required_count INTEGER NOT NULL DEFAULT 0,
+  conflict_count INTEGER NOT NULL DEFAULT 0,
+  errors JSONB NOT NULL DEFAULT '[]'::jsonb
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_resolution_runs_status
+  ON entity_resolution_runs(status, completed_at DESC);
+
+CREATE TABLE IF NOT EXISTS entity_resolution_candidates (
+  id TEXT PRIMARY KEY,
+  entity_resolution_run_id TEXT NOT NULL REFERENCES entity_resolution_runs(id) ON DELETE CASCADE,
+  source_entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  candidate_entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  entity_type TEXT NOT NULL,
+  match_method TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('AUTO_CONFIRMED','REVIEW_REQUIRED','CONFLICT','REJECTED')),
+  fingerprint TEXT NOT NULL,
+  rationale TEXT NOT NULL,
+  evidence_observation_ids TEXT[] NOT NULL DEFAULT '{}'::text[],
+  evidence_edge_ids TEXT[] NOT NULL DEFAULT '{}'::text[],
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(entity_resolution_run_id, fingerprint)
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_resolution_candidates_run
+  ON entity_resolution_candidates(entity_resolution_run_id);
+
+CREATE INDEX IF NOT EXISTS idx_entity_resolution_candidates_source
+  ON entity_resolution_candidates(source_entity_id);
+
+CREATE INDEX IF NOT EXISTS idx_entity_resolution_candidates_candidate
+  ON entity_resolution_candidates(candidate_entity_id);
+
+CREATE INDEX IF NOT EXISTS idx_entity_resolution_candidates_status
+  ON entity_resolution_candidates(status);
+
+CREATE TABLE IF NOT EXISTS entity_resolution_assertions (
+  id TEXT PRIMARY KEY,
+  source_entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  canonical_entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  assertion_type TEXT NOT NULL CHECK (assertion_type IN ('AUTO_CONFIRMED','HUMAN_CONFIRMED','HUMAN_REJECTED')),
+  resolution_run_id TEXT REFERENCES entity_resolution_runs(id),
+  evidence_observation_ids TEXT[] NOT NULL DEFAULT '{}'::text[],
+  evidence_edge_ids TEXT[] NOT NULL DEFAULT '{}'::text[],
+  basis JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_resolution_assertions_source
+  ON entity_resolution_assertions(source_entity_id);
+
+CREATE INDEX IF NOT EXISTS idx_entity_resolution_assertions_canonical
+  ON entity_resolution_assertions(canonical_entity_id);
+
+CREATE INDEX IF NOT EXISTS idx_entity_resolution_assertions_type
+  ON entity_resolution_assertions(assertion_type);
+
+CREATE OR REPLACE FUNCTION bantaylink_prevent_resolution_assertion_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'BantayLink resolution assertions are append-only; % is not permitted', TG_OP;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS entity_resolution_assertions_append_only ON entity_resolution_assertions;
+CREATE TRIGGER entity_resolution_assertions_append_only
+BEFORE UPDATE OR DELETE ON entity_resolution_assertions
+FOR EACH ROW EXECUTE FUNCTION bantaylink_prevent_resolution_assertion_mutation();
