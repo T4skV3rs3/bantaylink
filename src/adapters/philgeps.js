@@ -138,8 +138,13 @@ export const philgepsAdapter = {
         yield {
           payload: row,
           url,
+          retrievalUrl: response.url,
+          requestMethod: "GET",
+          responseHeaders: headersToObject(response.headers),
           httpStatus: response.status,
           mimeType: contentType || (isJson ? "application/json" : "text/csv"),
+          payloadEncoding: "utf-8",
+          hashScope: "canonical_payload",
           contentHash: sha256(row)
         };
         yielded += 1;
