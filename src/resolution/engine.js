@@ -113,7 +113,7 @@ function makeProcurementOrganizationIdentities(entity, observationIndex) {
       identityType: "organization",
       entityId: entity.id,
       sourceId: observationsFor(observationIndex, entity.id, "procurement_event")[0]?.sourceId ?? null,
-      sourceRecordId: data.referenceNumber ?? entity.canonicalKey,
+      sourceRecordId: (data.referenceNumber ?? entity.canonicalKey) + ":" + role,
       identityKey: identity.key,
       normalizedName: normalizeName(value),
       organizationName: value,
