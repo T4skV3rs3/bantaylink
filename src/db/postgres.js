@@ -334,7 +334,8 @@ export function createPostgresStore(pool) {
                    auto_confirmed_count AS "autoConfirmedCount",
                    review_required_count AS "reviewRequiredCount",
                    conflict_count AS "conflictCount",
-                   cluster_count AS "clusterCount", errors`,
+                   cluster_count AS "clusterCount",
+                   truncated, errors`,
         [input.id, input.engineVersion]
       );
       return result.rows[0];
@@ -398,7 +399,7 @@ export function createPostgresStore(pool) {
          SET status='completed', completed_at=NOW(),
              entity_count=$2, candidate_count=$3,
              auto_confirmed_count=$4, review_required_count=$5,
-             conflict_count=$6, cluster_count=$7, errors=$8::jsonb
+             conflict_count=$6, cluster_count=$7, truncated=$8, errors=$9::jsonb
          WHERE id=$1
          RETURNING id, engine_version AS "engineVersion", status,
                    started_at AS "startedAt", completed_at AS "completedAt",
@@ -410,7 +411,7 @@ export function createPostgresStore(pool) {
         [
           id, patch.entityCount, patch.candidateCount,
           patch.autoConfirmedCount, patch.reviewRequiredCount,
-          patch.conflictCount, patch.clusterCount ?? 0, JSON.stringify(patch.errors ?? [])
+          patch.conflictCount, patch.clusterCount ?? 0, Boolean(patch.truncated), JSON.stringify(patch.errors ?? [])
         ]
       );
       return result.rows[0];
@@ -427,7 +428,9 @@ export function createPostgresStore(pool) {
                    entity_count AS "entityCount", candidate_count AS "candidateCount",
                    auto_confirmed_count AS "autoConfirmedCount",
                    review_required_count AS "reviewRequiredCount",
-                   conflict_count AS "conflictCount", errors`,
+                   conflict_count AS "conflictCount",
+                   cluster_count AS "clusterCount",
+                   truncated, errors`,
         [id, JSON.stringify([{ stage: "run", message: String(error?.message ?? error), at: new Date().toISOString() }])]
       );
       return result.rows[0];
