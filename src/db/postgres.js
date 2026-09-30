@@ -197,21 +197,41 @@ export function createPostgresStore(pool) {
     },
 
     async getCorrelationSnapshot() {
-      const [entities, observations, edges] = await Promise.all([
-        pool.query(`SELECT id, entity_type AS "entityType", canonical_key AS "canonicalKey",
-                           label, data, first_seen_at AS "firstSeenAt", last_seen_at AS "lastSeenAt"
-                    FROM entities`),
-        pool.query(`SELECT id, entity_id AS "entityId", source_id AS "sourceId",
-                           ingestion_run_id AS "ingestionRunId", raw_document_id AS "rawDocumentId",
-                           record_type AS "recordType", source_record_id AS "sourceRecordId",
-                           observed_at AS "observedAt", content_hash AS "contentHash", data
-                    FROM observations`),
-        pool.query(`SELECT id, from_entity_id AS "fromEntityId", to_entity_id AS "toEntityId",
-                           edge_type AS "edgeType", source_id AS "sourceId",
-                           ingestion_run_id AS "ingestionRunId", raw_document_id AS "rawDocumentId",
-                           source_record_id AS "sourceRecordId", observed_at AS "observedAt",
-                           content_hash AS "contentHash", data
-                    FROM edges`)
+      const entities = await pool.query(
+        `SELECT id, entity_type AS "entityType", canonical_key AS "canonicalKey",
+                label, data, first_seen_at AS "firstSeenAt", last_seen_at AS "lastSeenAt"
+         FROM entities
+         WHERE entity_type='project'
+            OR (entity_type='election_result'
+                AND COALESCE(data->>'dataset','') <> 'NLE_Vote_Counts_2007-2025'`
+      );
+
+      const entityIds = entities.rows.map(row => row.id);
+      const [observations, edges] = await Promise.all([
+        entityIds.length
+          ? pool.query(
+              `SELECT id, entity_id AS "entityId", source_id AS "sourceId",
+                      ingestion_run_id AS "ingestionRunId", raw_document_id AS "rawDocumentId",
+                      record_type AS "recordType", source_record_id AS "sourceRecordId",
+                      observed_at AS "observedAt", content_hash AS "contentHash", data
+               FROM observations
+               WHERE entity_id = ANY($1::text[])`,
+              [entityIds]
+            )
+          : { rows: [] },
+        entityIds.length
+          ? pool.query(
+              `SELECT id, from_entity_id AS "fromEntityId", to_entity_id AS "toEntityId",
+                      edge_type AS "edgeType", source_id AS "sourceId",
+                      ingestion_run_id AS "ingestionRunId", raw_document_id AS "rawDocumentId",
+                      source_record_id AS "sourceRecordId", observed_at AS "observedAt",
+                      content_hash AS "contentHash", data
+               FROM edges
+               WHERE from_entity_id = ANY($1::text[])
+                  OR to_entity_id = ANY($1::text[])`,
+              [entityIds]
+            )
+          : { rows: [] }
       ]);
 
       return {
