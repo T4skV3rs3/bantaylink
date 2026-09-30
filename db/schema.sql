@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS ingestion_runs (
   adapter_id TEXT NOT NULL,
   source_id TEXT REFERENCES sources(id),
   source_version TEXT,
+  source_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
   started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   completed_at TIMESTAMPTZ,
   status TEXT NOT NULL CHECK (status IN ('running','completed','failed')),
@@ -31,15 +32,50 @@ CREATE TABLE IF NOT EXISTS raw_documents (
   ingestion_run_id TEXT NOT NULL REFERENCES ingestion_runs(id) ON DELETE CASCADE,
   source_id TEXT NOT NULL REFERENCES sources(id),
   canonical_url TEXT,
+  retrieval_url TEXT,
+  request_method TEXT NOT NULL DEFAULT 'GET',
+  response_headers JSONB NOT NULL DEFAULT '{}'::jsonb,
   retrieved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   http_status INTEGER,
   mime_type TEXT,
+  payload_encoding TEXT NOT NULL DEFAULT 'jsonb',
+  hash_algorithm TEXT NOT NULL DEFAULT 'sha256',
+  hash_scope TEXT NOT NULL DEFAULT 'canonical_payload'
+    CHECK (hash_scope IN ('raw_content','canonical_payload')),
   content_hash TEXT NOT NULL,
   payload JSONB NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_raw_documents_hash
   ON raw_documents(content_hash);
+
+CREATE INDEX IF NOT EXISTS idx_raw_documents_source_time
+  ON raw_documents(source_id, retrieved_at DESC);
+
+ALTER TABLE ingestion_runs
+  ADD COLUMN IF NOT EXISTS source_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+ALTER TABLE raw_documents
+  ADD COLUMN IF NOT EXISTS retrieval_url TEXT;
+
+ALTER TABLE raw_documents
+  ADD COLUMN IF NOT EXISTS request_method TEXT NOT NULL DEFAULT 'GET';
+
+ALTER TABLE raw_documents
+  ADD COLUMN IF NOT EXISTS response_headers JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+ALTER TABLE raw_documents
+  ADD COLUMN IF NOT EXISTS payload_encoding TEXT NOT NULL DEFAULT 'jsonb';
+
+ALTER TABLE raw_documents
+  ADD COLUMN IF NOT EXISTS hash_algorithm TEXT NOT NULL DEFAULT 'sha256';
+
+ALTER TABLE raw_documents
+  ADD COLUMN IF NOT EXISTS hash_scope TEXT NOT NULL DEFAULT 'canonical_payload';
+
+UPDATE raw_documents
+SET retrieval_url = COALESCE(retrieval_url, canonical_url)
+WHERE retrieval_url IS NULL;
 
 CREATE TABLE IF NOT EXISTS entities (
   id TEXT PRIMARY KEY,
@@ -75,6 +111,20 @@ CREATE INDEX IF NOT EXISTS idx_observations_source
 CREATE INDEX IF NOT EXISTS idx_observations_hash
   ON observations(content_hash);
 
+CREATE TABLE IF NOT EXISTS observation_occurrences (
+  observation_id TEXT NOT NULL REFERENCES observations(id) ON DELETE CASCADE,
+  ingestion_run_id TEXT NOT NULL REFERENCES ingestion_runs(id) ON DELETE RESTRICT,
+  raw_document_id TEXT NOT NULL REFERENCES raw_documents(id) ON DELETE RESTRICT,
+  seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (observation_id, ingestion_run_id, raw_document_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_observation_occurrences_run
+  ON observation_occurrences(ingestion_run_id);
+
+CREATE INDEX IF NOT EXISTS idx_observation_occurrences_raw
+  ON observation_occurrences(raw_document_id);
+
 CREATE TABLE IF NOT EXISTS edges (
   id TEXT PRIMARY KEY,
   from_entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
@@ -99,6 +149,68 @@ CREATE INDEX IF NOT EXISTS idx_edges_to
 CREATE INDEX IF NOT EXISTS idx_edges_type
   ON edges(edge_type);
 
+CREATE TABLE IF NOT EXISTS edge_occurrences (
+  edge_id TEXT NOT NULL REFERENCES edges(id) ON DELETE CASCADE,
+  ingestion_run_id TEXT NOT NULL REFERENCES ingestion_runs(id) ON DELETE RESTRICT,
+  raw_document_id TEXT NOT NULL REFERENCES raw_documents(id) ON DELETE RESTRICT,
+  seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (edge_id, ingestion_run_id, raw_document_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_edge_occurrences_run
+  ON edge_occurrences(ingestion_run_id);
+
+CREATE INDEX IF NOT EXISTS idx_edge_occurrences_raw
+  ON edge_occurrences(raw_document_id);
+
+-- Backfill repeat-run provenance for records already ingested before occurrence
+-- tables existed. Future runs record each observation/edge occurrence explicitly.
+INSERT INTO observation_occurrences (observation_id, ingestion_run_id, raw_document_id, seen_at)
+SELECT id, ingestion_run_id, raw_document_id, observed_at
+FROM observations
+WHERE raw_document_id IS NOT NULL
+ON CONFLICT DO NOTHING;
+
+INSERT INTO edge_occurrences (edge_id, ingestion_run_id, raw_document_id, seen_at)
+SELECT id, ingestion_run_id, raw_document_id, observed_at
+FROM edges
+WHERE raw_document_id IS NOT NULL
+ON CONFLICT DO NOTHING;
+
+CREATE OR REPLACE FUNCTION bantaylink_prevent_provenance_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'BantayLink provenance table % is append-only; % is not permitted',
+    TG_TABLE_NAME, TG_OP;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS raw_documents_append_only ON raw_documents;
+CREATE TRIGGER raw_documents_append_only
+BEFORE UPDATE OR DELETE ON raw_documents
+FOR EACH ROW EXECUTE FUNCTION bantaylink_prevent_provenance_mutation();
+
+DROP TRIGGER IF EXISTS observations_append_only ON observations;
+CREATE TRIGGER observations_append_only
+BEFORE UPDATE OR DELETE ON observations
+FOR EACH ROW EXECUTE FUNCTION bantaylink_prevent_provenance_mutation();
+
+DROP TRIGGER IF EXISTS edges_append_only ON edges;
+CREATE TRIGGER edges_append_only
+BEFORE UPDATE OR DELETE ON edges
+FOR EACH ROW EXECUTE FUNCTION bantaylink_prevent_provenance_mutation();
+
+DROP TRIGGER IF EXISTS observation_occurrences_append_only ON observation_occurrences;
+CREATE TRIGGER observation_occurrences_append_only
+BEFORE UPDATE OR DELETE ON observation_occurrences
+FOR EACH ROW EXECUTE FUNCTION bantaylink_prevent_provenance_mutation();
+
+DROP TRIGGER IF EXISTS edge_occurrences_append_only ON edge_occurrences;
+CREATE TRIGGER edge_occurrences_append_only
+BEFORE UPDATE OR DELETE ON edge_occurrences
+FOR EACH ROW EXECUTE FUNCTION bantaylink_prevent_provenance_mutation();
 
 CREATE TABLE IF NOT EXISTS correlation_runs (
   id TEXT PRIMARY KEY,
