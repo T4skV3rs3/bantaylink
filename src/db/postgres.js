@@ -685,7 +685,7 @@ export function createPostgresStore(pool) {
          RETURNING id, engine_version AS "engineVersion", status,
                    started_at AS "startedAt", completed_at AS "completedAt",
                    entity_count AS "entityCount", observation_count AS "observationCount",
-                   edge_count AS "edgeCount", finding_count AS "findingCount", errors`,
+                   edge_count AS "edgeCount", finding_count AS "findingCount", truncated, errors`,
         [
           id,
           patch.entityCount,
