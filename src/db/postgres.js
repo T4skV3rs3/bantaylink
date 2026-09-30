@@ -521,8 +521,7 @@ export function createPostgresStore(pool) {
                   r.retrieval_url AS "retrievalUrl", r.retrieved_at AS "retrievedAt",
                   r.http_status AS "httpStatus", r.mime_type AS "mimeType",
                   r.payload_encoding AS "payloadEncoding", r.hash_algorithm AS "hashAlgorithm",
-                  r.hash_scope AS "hashScope", r.content_hash AS "rawContentHash",
-                  r.payload
+                  r.hash_scope AS "hashScope", r.content_hash AS "rawContentHash"
            FROM observations o
            JOIN sources s ON s.id=o.source_id
            LEFT JOIN raw_documents r ON r.id=o.raw_document_id
