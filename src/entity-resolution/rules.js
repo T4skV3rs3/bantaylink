@@ -1,6 +1,6 @@
 import { sha256 } from "../ingestion/hash.js";
 
-export const ENTITY_RESOLUTION_ENGINE_VERSION = "1.1.0";
+export const ENTITY_RESOLUTION_ENGINE_VERSION = "1.2.0";
 
 const WINNER_DATASET = "NLE_Winners_2004-2025";
 const MAX_EVIDENCE_IDS_PER_ENTITY = 100;
@@ -119,9 +119,12 @@ function stableExternalId(entity) {
   if (entity.entityType === "project") {
     const id = clean(data.contractId ?? data.spId);
     if (id) {
+      const namespace = data.contractId ? "contract_id" : "sp_id";
       return {
-        namespace: data.contractId ? "contract_id" : "sp_id",
+        namespace,
         value: id,
+        identifierScope: "source_scoped",
+        scopeKey: clean(entity.canonicalKey).split(":")[0] || entity.entityType,
         identityScope: "entity_identity"
       };
     }
@@ -134,6 +137,8 @@ function stableExternalId(entity) {
       return {
         namespace: "procurement_reference",
         value: procuring ? procuring + "::" + id : id,
+        identifierScope: "source_scoped",
+        scopeKey: "philgeps",
         identityScope: "entity_identity"
       };
     }
@@ -145,6 +150,8 @@ function stableExternalId(entity) {
       return {
         namespace: data.pcabId ? "pcab_id" : "stable_contractor_id",
         value: id,
+        identifierScope: data.pcabId ? "global" : "source_scoped",
+        scopeKey: data.pcabId ? "global" : (clean(entity.canonicalKey).split(":")[0] || entity.entityType),
         identityScope: "entity_identity"
       };
     }
@@ -153,13 +160,16 @@ function stableExternalId(entity) {
   if (entity.entityType === "source") {
     const id = clean(data.documentId ?? data.trackingNumber ?? data.url);
     if (id) {
+      const namespace = data.documentId
+        ? "document_id"
+        : data.trackingNumber
+          ? "tracking_number"
+          : "source_reference";
       return {
-        namespace: data.documentId
-          ? "document_id"
-          : data.trackingNumber
-            ? "tracking_number"
-            : "source_reference",
+        namespace,
         value: id,
+        identifierScope: "source_scoped",
+        scopeKey: clean(entity.canonicalKey).split(":")[0] || entity.entityType,
         identityScope: "entity_identity"
       };
     }
@@ -171,6 +181,8 @@ function stableExternalId(entity) {
       return {
         namespace: data.stablePersonId ? "stable_person_id" : "source_person_id",
         value: id,
+        identifierScope: "source_scoped",
+        scopeKey: clean(entity.canonicalKey).split(":")[0] || entity.entityType,
         identityScope: "entity_identity"
       };
     }
@@ -182,6 +194,8 @@ function stableExternalId(entity) {
       return {
         namespace: data.stableOrganizationId ? "stable_organization_id" : "source_organization_id",
         value: id,
+        identifierScope: "source_scoped",
+        scopeKey: clean(entity.canonicalKey).split(":")[0] || entity.entityType,
         identityScope: "entity_identity"
       };
     }
@@ -276,7 +290,8 @@ function buildStableIndex(entities) {
     const external = stableExternalId(entity);
     if (!external) continue;
 
-    const key = entity.entityType + "::" + external.namespace + "::" + normalizeText(external.value);
+    const key = entity.entityType + "::" + external.identifierScope + "::" + external.scopeKey + "::" +
+      external.namespace + "::" + normalizeText(external.value);
     const list = index.get(key) ?? [];
     list.push(entity);
     index.set(key, list);
@@ -298,6 +313,21 @@ function buildPersonNameIndex(entities) {
     }
   }
 
+  return index;
+}
+
+function buildOrganizationNameIndex(entities) {
+  const index = new Map();
+  for (const entity of entities) {
+    if (entity.entityType !== "organization") continue;
+    const name = normalizeOrganizationName(
+      entity.data?.legalName ?? entity.data?.name ?? entity.data?.organizationName
+    );
+    if (!name) continue;
+    const list = index.get(name) ?? [];
+    list.push({ entity, stableId: stableExternalId(entity) });
+    index.set(name, list);
+  }
   return index;
 }
 
@@ -387,6 +417,7 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
   const stable = buildStableIndex(entities);
   const personNames = buildPersonNameIndex(entities);
   const contractorNames = buildContractorNameIndex(entities);
+  const organizationNames = buildOrganizationNameIndex(entities);
   const candidates = [];
   const seen = new Set();
   let truncated = false;
@@ -404,7 +435,8 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
     const external = stableExternalId(sourceEntity);
 
     if (external) {
-      const key = sourceEntity.entityType + "::" + external.namespace + "::" + normalizeText(external.value);
+      const key = sourceEntity.entityType + "::" + external.identifierScope + "::" + external.scopeKey + "::" +
+        external.namespace + "::" + normalizeText(external.value);
       for (const targetEntity of stable.get(key) ?? []) {
         if (targetEntity.id === sourceEntity.id) continue;
         push(makeCandidate({
@@ -419,9 +451,60 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
           payload: {
             identityScope: external.identityScope,
             identifierNamespace: external.namespace,
-            identifierValue: external.value
+            identifierValue: external.value,
+            identifierScope: external.identifierScope,
+            identifierSourceScope: external.scopeKey
           }
         }));
+      }
+    }
+
+    if (sourceEntity.entityType === "organization") {
+      const sourceName = normalizeOrganizationName(
+        sourceEntity.data?.legalName ?? sourceEntity.data?.name ?? sourceEntity.data?.organizationName
+      );
+      if (sourceName) {
+        for (const peer of organizationNames.get(sourceName) ?? []) {
+          if (peer.entity.id === sourceEntity.id) continue;
+
+          const pair = sourceEntity.canonicalKey.localeCompare(peer.entity.canonicalKey) < 0
+            ? [sourceEntity, peer.entity]
+            : [peer.entity, sourceEntity];
+
+          if (pair[0].id !== sourceEntity.id) continue;
+
+          const aStable = stableExternalId(pair[0]);
+          const bStable = stableExternalId(pair[1]);
+          if (aStable?.value && bStable?.value && aStable.value !== bStable.value) {
+            push(makeCandidate({
+              a: pair[0],
+              b: pair[1],
+              entityType: "organization",
+              matchMethod: "organization_name_conflicting_identifier",
+              status: "CONFLICT",
+              rationale: "The organization names normalize to the same value but the records expose different stable identifiers. They must not be merged automatically.",
+              evidenceObservationIds: pairEvidence(obsIndex, pair[0].id, pair[1].id),
+              evidenceEdgeIds: pairEvidence(edgeIdx, pair[0].id, pair[1].id),
+              payload: {
+                normalizedName: sourceName,
+                sourceIdentifier: aStable.value,
+                candidateIdentifier: bStable.value
+              }
+            }));
+          } else if (!aStable?.value && !bStable?.value) {
+            push(makeCandidate({
+              a: pair[0],
+              b: pair[1],
+              entityType: "organization",
+              matchMethod: "normalized_organization_name",
+              status: "REVIEW_REQUIRED",
+              rationale: "The organization names normalize to the same value without a shared stable identifier. This is a review candidate only.",
+              evidenceObservationIds: pairEvidence(obsIndex, pair[0].id, pair[1].id),
+              evidenceEdgeIds: pairEvidence(edgeIdx, pair[0].id, pair[1].id),
+              payload: { normalizedName: sourceName }
+            }));
+          }
+        }
       }
     }
 
