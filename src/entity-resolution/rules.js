@@ -506,7 +506,8 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
 
   return {
     engineVersion: ENTITY_RESOLUTION_ENGINE_VERSION,
-    candidates
+    candidates,
+    truncated
   };
 }
 
