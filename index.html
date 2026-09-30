@@ -45,7 +45,7 @@ button,input,select{font:inherit}button{color:inherit}a{color:inherit}.shell{max
 
 <script>
 const NAV=[["overview","Overview"],["projects","Infrastructure"],["dynasties","Political families"],["correlations","Correlations"],["evidence","Evidence"],["resolution","Entity resolution"]];
-const state={tab:"overview",query:"",entities:[],entityDetail:null,evidenceBundle:null,findings:[],finding:null,resolution:null,live:false,seed:[],selectedEntityId:null};
+const state={tab:"overview",query:"",entities:[],entityDetail:null,evidenceBundle:null,findings:[],finding:null,resolution:null,correlationRun:null,live:false,seed:[],selectedEntityId:null};
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmtDate=s=>s?new Date(s).toLocaleString():"Not supplied";
 const uniq=a=>[...new Set(a||[])];
@@ -76,7 +76,7 @@ async function openEvidenceTrace(query){
     render();
   }catch(e){state.evidenceBundle={error:e.message};render()}
 }
-async function loadCorrelations(){if(!state.live)return;try{const d=await getJson("./api/correlations?limit=120");state.findings=d.findings||[]}catch{}}
+async function loadCorrelations(){if(!state.live)return;try{const d=await getJson("./api/correlations?limit=120");state.correlationRun=d.run||null;state.findings=d.findings||[]}catch{state.correlationRun=null;state.findings=[]}}
 async function loadResolution(){if(!state.live)return;try{const d=await getJson("./api/entity-resolution?limit=160");state.resolution=d}catch{}}
 async function refreshData(){await checkHealth();if(state.live){await loadEntities();await loadCorrelations();await loadResolution()}render()}
 
@@ -119,9 +119,9 @@ function dynastiesView(){
 function correlationsView(){
   if(!state.live)return '<section class="panel"><div class="eyebrow">CORRELATIONS</div><h2 style="margin-top:6px">Live finding evidence is waiting for the database.</h2><p class="note" style="margin-top:8px">Run the provenance database and correlation engine to populate findings. The static seed remains available for infrastructure/source review.</p></section>';
   if(!state.findings.length)return '<section class="panel empty">No completed correlation run is available yet.</section>';
-  const completeness=state.resolution?.run?.truncated?'<div class="callout" style="margin-top:10px">This resolution run was bounded by its candidate limit and is not exhaustive. Treat the displayed candidate set as a partial result.</div>':"";
-  const runNote=state.findings?.length?"" :"";
-  return '<div class="grid two"><section class="panel"><div class="section" style="margin-top:0"><h2>Latest correlation findings</h2><span class="muted">'+state.findings.length+' loaded</span></div>'+((state.resolution?.run?.truncated)?'<div class="callout" style="margin-top:10px">The loaded resolution run is bounded. This correlation view only reflects findings produced from the currently available evidence snapshot.</div>':"")+state.findings.map((f,i)=>'<div class="finding '+(state.finding===i?"selected":"")+'" data-finding="'+i+'"><div class="label"><strong>'+esc(f.findingType)+'</strong><span class="pill '+statusClass(f.status)+'">'+esc(f.status)+'</span></div><p>'+esc(f.payload?.statement||"No statement supplied.")+'</p><div class="meta"><span>Rule: '+esc(f.ruleId)+'</span><span>Evidence: '+esc((f.evidenceObservationIds||[]).length)+' obs / '+esc((f.evidenceEdgeIds||[]).length)+' edges</span></div></div>').join('')+'</section>'+findingDetail()+'</div>';
+  const run=state.correlationRun;
+  const completeness=run?.truncated?'<div class="callout" style="margin-top:10px">This correlation run was bounded by its finding limit and is not exhaustive. The displayed findings are a partial result.</div>':"";
+  return '<div class="grid two"><section class="panel"><div class="section" style="margin-top:0"><h2>Latest correlation findings</h2><span class="muted">'+state.findings.length+' loaded</span></div>'+completeness+(run?'<div class="meta"><span>Run: '+esc(run.id)+'</span><span>Engine: '+esc(run.engineVersion)+'</span><span>Completed: '+esc(fmtDate(run.completedAt))+'</span></div>':"")+state.findings.map((f,i)=>'<div class="finding '+(state.finding===i?"selected":"")+'" data-finding="'+i+'"><div class="label"><strong>'+esc(f.findingType)+'</strong><span class="pill '+statusClass(f.status)+'">'+esc(f.status)+'</span></div><p>'+esc(f.payload?.statement||"No statement supplied.")+'</p><div class="meta"><span>Rule: '+esc(f.ruleId)+'</span><span>Evidence: '+esc((f.evidenceObservationIds||[]).length)+' obs / '+esc((f.evidenceEdgeIds||[]).length)+' edges</span></div></div>').join('')+'</section>'+findingDetail()+'</div>';
 }
 function findingDetail(){
   const f=state.finding==null?null:state.findings[state.finding];
