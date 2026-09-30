@@ -98,3 +98,42 @@ CREATE INDEX IF NOT EXISTS idx_edges_to
 
 CREATE INDEX IF NOT EXISTS idx_edges_type
   ON edges(edge_type);
+
+
+CREATE TABLE IF NOT EXISTS correlation_runs (
+  id TEXT PRIMARY KEY,
+  engine_version TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('running','completed','failed')),
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  entity_count INTEGER NOT NULL DEFAULT 0,
+  observation_count INTEGER NOT NULL DEFAULT 0,
+  edge_count INTEGER NOT NULL DEFAULT 0,
+  finding_count INTEGER NOT NULL DEFAULT 0,
+  errors JSONB NOT NULL DEFAULT '[]'::jsonb
+);
+
+CREATE TABLE IF NOT EXISTS correlation_findings (
+  id TEXT PRIMARY KEY,
+  correlation_run_id TEXT NOT NULL REFERENCES correlation_runs(id) ON DELETE CASCADE,
+  rule_id TEXT NOT NULL,
+  finding_type TEXT NOT NULL,
+  status TEXT NOT NULL,
+  fingerprint TEXT NOT NULL,
+  subject_entity_id TEXT REFERENCES entities(id) ON DELETE SET NULL,
+  related_entity_ids TEXT[] NOT NULL DEFAULT '{}'::text[],
+  evidence_observation_ids TEXT[] NOT NULL DEFAULT '{}'::text[],
+  evidence_edge_ids TEXT[] NOT NULL DEFAULT '{}'::text[],
+  payload JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(correlation_run_id, fingerprint)
+);
+
+CREATE INDEX IF NOT EXISTS idx_correlation_findings_run
+  ON correlation_findings(correlation_run_id);
+
+CREATE INDEX IF NOT EXISTS idx_correlation_findings_rule
+  ON correlation_findings(rule_id);
+
+CREATE INDEX IF NOT EXISTS idx_correlation_findings_subject
+  ON correlation_findings(subject_entity_id);
