@@ -218,8 +218,12 @@ CREATE TABLE IF NOT EXISTS correlation_runs (
   observation_count INTEGER NOT NULL DEFAULT 0,
   edge_count INTEGER NOT NULL DEFAULT 0,
   finding_count INTEGER NOT NULL DEFAULT 0,
+  truncated BOOLEAN NOT NULL DEFAULT FALSE,
   errors JSONB NOT NULL DEFAULT '[]'::jsonb
 );
+
+ALTER TABLE correlation_runs
+  ADD COLUMN IF NOT EXISTS truncated BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS correlation_findings (
   id TEXT PRIMARY KEY,
