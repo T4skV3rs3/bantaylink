@@ -153,6 +153,6 @@ export const philgepsAdapter = {
   },
 
   normalize(record, { contentHash, rawDocument }) {
-    return normalizePhilgepsRecord(record, contentHash, rawDocument?.canonicalUrl ?? null);
+    return normalizePhilgepsRecord(record, contentHash, rawDocument?.retrievalUrl ?? null);
   }
 };
