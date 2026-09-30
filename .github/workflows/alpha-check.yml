@@ -46,6 +46,9 @@ jobs:
           test -f src/adapters/openhalalan.js
           test -f src/adapters/dpwh.js
           test -f src/adapters/dpwh-efoi.js
+          test -f src/adapters/da-sidlan.js
+          test -f src/adapters/coa-elibrary.js
+          test -f src/adapters/philgeps.js
           test -f scripts/test-adapters.mjs
           test -f scripts/ingest-source.mjs
           test -f src/correlation/engine.js
@@ -54,8 +57,20 @@ jobs:
           test -f scripts/run-correlation.mjs
           test -f api/correlations.js
 
-      - name: Syntax-check correlation code
+      - name: Syntax-check ingestion and correlation code
         run: |
+          node --check src/ingestion/engine.js
+          node --check src/ingestion/http.js
+          node --check src/adapters/da-sidlan.js
+          node --check src/adapters/coa-elibrary.js
+          node --check src/adapters/philgeps.js
+          node --check src/adapters/openhalalan.js
+          node --check src/adapters/dpwh.js
+          node --check src/adapters/dpwh-efoi.js
+          node --check src/db/memory.js
+          node --check src/db/postgres.js
+          node --check scripts/test-ingestion.mjs
+          node --check scripts/test-adapters.mjs
           node --check src/correlation/rules.js
           node --check src/correlation/engine.js
           node --check src/db/postgres.js
