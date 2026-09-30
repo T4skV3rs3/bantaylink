@@ -17,18 +17,35 @@ function normalizePlace(value) {
   return clean(value)
     .toUpperCase()
     .replace(/[()]/g, " ")
+    .replace(/\bPROVINCE\b/g, "")
     .replace(/[^A-Z0-9]+/g, " ")
-    .replace(/PROVINCE/g, "")
-    .replace(/s+/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
-function normalizePersonName(value) {
-  return clean(value).toUpperCase().replace(/[^A-Z0-9]+/g, " ").replace(/s+/g, " ").trim();
+function normalizeContractor(value) {
+  return clean(value)
+    .toUpperCase()
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[^A-Z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-function normalizeContractor(value) {
-  return clean(value).toUpperCase().replace(/\([^)]*\)/g, " ").replace(/[^A-Z0-9]+/g, " ").replace(/s+/g, " ").trim();
+function contractorIdentity(project) {
+  const explicitPcab = clean(project.data?.pcabId);
+  if (explicitPcab) return { key: "pcab:" + explicitPcab, basis: "pcab_id" };
+
+  const bidders = Array.isArray(project.data?.bidders) ? project.data.bidders : [];
+  const winner = bidders.find(
+    item => item?.isWinner === true || String(item?.isWinner).toLowerCase() === "true"
+  );
+  const winnerPcab = clean(winner?.pcabId);
+  if (winnerPcab) return { key: "pcab:" + winnerPcab, basis: "winning_bidder_pcab_id" };
+
+  const name = normalizeContractor(project.data?.contractor);
+  if (!name) return null;
+  return { key: "name:" + name, basis: "normalized_contractor_name" };
 }
 
 function toNumber(value) {
@@ -38,7 +55,7 @@ function toNumber(value) {
 }
 
 function yearFromDate(value) {
-  const match = clean(value).match(/(?:19|20)d{2}/);
+  const match = clean(value).match(/(?:19|20)\d{2}/);
   return match ? Number(match[0]) : null;
 }
 
@@ -67,28 +84,27 @@ function getProjectLocation(project) {
   return {
     city: normalizePlace(location.city ?? location.municipality ?? location.town),
     municipality: normalizePlace(location.municipality ?? location.city ?? location.town),
-    province: normalizePlace(location.province),
-    region: normalizePlace(location.region)
+    province: normalizePlace(location.province)
   };
 }
 
-function getElectionLocation(entity) {
-  const data = entity.data ?? {};
+function createObservationIndex(snapshot) {
+  const byEntity = new Map();
+  for (const observation of snapshot.observations) {
+    const list = byEntity.get(observation.entityId) ?? [];
+    list.push(observation);
+    byEntity.set(observation.entityId, list);
+  }
 
-  return {
-    city: normalizePlace(data.city),
-    province: normalizePlace(data.province),
-    region: normalizePlace(data.region)
-  };
-}
-
-function projectObservationRows(snapshot, entityId) {
-  return snapshot.observations
-    .filter(row => row.entityId === entityId)
-    .sort((a, b) =>
-      String(a.observedAt).localeCompare(String(b.observedAt)) ||
-      String(a.id).localeCompare(String(b.id))
+  for (const list of byEntity.values()) {
+    list.sort(
+      (a, b) =>
+        String(a.observedAt).localeCompare(String(b.observedAt)) ||
+        String(a.id).localeCompare(String(b.id))
     );
+  }
+
+  return byEntity;
 }
 
 function projectEntities(snapshot) {
@@ -99,55 +115,43 @@ function electionEntities(snapshot) {
   return snapshot.entities.filter(entity => entity.entityType === "election_result");
 }
 
-function findingFingerprint(input) {
-  return sha256(input);
-}
-
 function baseFinding({
   ruleId,
   findingType,
   status,
+  dedupeKey,
   subjectEntityId = null,
   relatedEntityIds = [],
   evidenceObservationIds = [],
   evidenceEdgeIds = [],
   payload
 }) {
-  const stable = {
+  const fingerprint = sha256({
+    engineVersion: CORRELATION_ENGINE_VERSION,
     ruleId,
     findingType,
-    subjectEntityId,
-    relatedEntityIds: [...relatedEntityIds].sort(),
-    evidenceObservationIds: [...evidenceObservationIds].sort(),
-    evidenceEdgeIds: [...evidenceEdgeIds].sort(),
-    payload
-  };
+    dedupeKey
+  });
 
   return {
     id: null,
     ruleId,
     findingType,
     status,
-    fingerprint: findingFingerprint({
-      ruleId,
-      findingType,
-      subjectEntityId,
-      relatedEntityIds: stable.relatedEntityIds,
-      payload
-    }),
+    fingerprint,
     subjectEntityId,
-    relatedEntityIds: stable.relatedEntityIds,
-    evidenceObservationIds: stable.evidenceObservationIds,
-    evidenceEdgeIds: stable.evidenceEdgeIds,
+    relatedEntityIds: [...relatedEntityIds].sort(),
+    evidenceObservationIds: [...new Set(evidenceObservationIds)].sort(),
+    evidenceEdgeIds: [...new Set(evidenceEdgeIds)].sort(),
     payload
   };
 }
 
-export function findProjectStatusHistories(snapshot) {
+export function findProjectStatusHistories(snapshot, observationIndex = createObservationIndex(snapshot)) {
   const findings = [];
 
   for (const project of projectEntities(snapshot)) {
-    const observations = projectObservationRows(snapshot, project.id);
+    const observations = observationIndex.get(project.id) ?? [];
     if (observations.length < 2) continue;
 
     const states = observations.map(obs => ({
@@ -167,13 +171,25 @@ export function findProjectStatusHistories(snapshot) {
 
     if (distinctStatuses.size <= 1 && distinctProgress.size <= 1) continue;
 
-    const evidenceObservationIds = states.map(item => item.observationId);
+    const stableStates = states.map(item => ({
+      sourceId: item.sourceId,
+      sourceRecordId: item.sourceRecordId,
+      observedAt: item.observedAt,
+      status: item.status,
+      progress: item.progress,
+      contentHash: item.contentHash
+    }));
+
     findings.push(baseFinding({
       ruleId: "project-status-history",
       findingType: "STATUS_HISTORY",
       status: "VERIFIED_FACT",
+      dedupeKey: {
+        projectCanonicalKey: project.canonicalKey,
+        states: stableStates
+      },
       subjectEntityId: project.id,
-      evidenceObservationIds,
+      evidenceObservationIds: states.map(item => item.observationId),
       payload: {
         statement: "This project has multiple source observations with differing published status and/or progress values; this records source-state differences without asserting why they differ.",
         projectCanonicalKey: project.canonicalKey,
@@ -186,14 +202,13 @@ export function findProjectStatusHistories(snapshot) {
   return findings;
 }
 
-export function findProjectSourceDivergence(snapshot) {
+export function findProjectSourceDivergence(snapshot, observationIndex = createObservationIndex(snapshot)) {
   const findings = [];
 
   for (const project of projectEntities(snapshot)) {
-    const observations = projectObservationRows(snapshot, project.id);
-    const sourceIds = new Set(observations.map(obs => obs.sourceId));
-
-    if (sourceIds.size < 2) continue;
+    const observations = observationIndex.get(project.id) ?? [];
+    const sourceIds = [...new Set(observations.map(obs => obs.sourceId))].sort();
+    if (sourceIds.length < 2) continue;
 
     const observationsBySource = new Map();
     for (const obs of observations) {
@@ -202,26 +217,33 @@ export function findProjectSourceDivergence(snapshot) {
       observationsBySource.set(obs.sourceId, sourceList);
     }
 
-    const statusValues = new Set(
+    const statusValues = [...new Set(
       observations.map(obs => clean(obs.data?.status)).filter(Boolean)
-    );
+    )].sort();
 
     findings.push(baseFinding({
       ruleId: "project-multi-source-observation",
       findingType: "MULTI_SOURCE_PROJECT",
-      status: "CORROBORATED_FACT",
+      status: "VERIFIED_FACT",
+      dedupeKey: {
+        projectCanonicalKey: project.canonicalKey,
+        sourceIds,
+        contentHashes: [...new Set(observations.map(obs => obs.contentHash))].sort()
+      },
       subjectEntityId: project.id,
       evidenceObservationIds: observations.map(obs => obs.id),
       payload: {
-        statement: "The canonical project entity has observations from multiple source records.",
+        statement: "The canonical project entity has observations from multiple source records. Source independence has not been established by this rule.",
         projectCanonicalKey: project.canonicalKey,
-        sourceIds: [...sourceIds].sort(),
-        distinctPublishedStatuses: [...statusValues].sort(),
-        observations: [...observationsBySource.entries()].map(([sourceId, rows]) => ({
-          sourceId,
-          observationIds: rows.map(row => row.id),
-          statuses: [...new Set(rows.map(row => clean(row.data?.status)).filter(Boolean))].sort()
-        })).sort((a, b) => a.sourceId.localeCompare(b.sourceId))
+        sourceIds,
+        distinctPublishedStatuses: statusValues,
+        observations: [...observationsBySource.entries()]
+          .map(([sourceId, rows]) => ({
+            sourceId,
+            observationIds: rows.map(row => row.id),
+            statuses: [...new Set(rows.map(row => clean(row.data?.status)).filter(Boolean))].sort()
+          }))
+          .sort((a, b) => a.sourceId.localeCompare(b.sourceId))
       }
     }));
   }
@@ -229,39 +251,50 @@ export function findProjectSourceDivergence(snapshot) {
   return findings;
 }
 
-export function findContractorPortfolios(snapshot) {
+export function findContractorPortfolios(snapshot, observationIndex = createObservationIndex(snapshot)) {
   const groups = new Map();
 
   for (const project of projectEntities(snapshot)) {
     const contractor = contractorIdentity(project);
     if (!contractor) continue;
 
-    const item = groups.get(contractor.key) ?? [];
-    item.push({ project, contractor });
-    groups.set(contractor.key, item);
+    const entries = groups.get(contractor.key) ?? [];
+    entries.push({ project, contractor });
+    groups.set(contractor.key, entries);
   }
 
   const findings = [];
 
   for (const [contractorKey, entries] of groups) {
-    const uniqueProjects = [...new Map(entries.map(entry => [entry.project.canonicalKey, entry])).values()];
-    const contractorBasis = uniqueProjects[0]?.contractor?.basis;
-    const projectRows = uniqueProjects.map(entry => entry.project);
-    if (uniqueProjects.length < 2) continue;
+    const uniqueEntries = [...new Map(
+      entries.map(entry => [entry.project.canonicalKey, entry])
+    ).values()];
+
+    if (uniqueEntries.length < 2) continue;
+
+    const projectRows = uniqueEntries
+      .map(entry => entry.project)
+      .sort((a, b) => a.canonicalKey.localeCompare(b.canonicalKey));
 
     findings.push(baseFinding({
       ruleId: "contractor-project-portfolio",
       findingType: "CONTRACTOR_PORTFOLIO",
       status: "VERIFIED_FACT",
+      dedupeKey: {
+        contractorIdentityKey: contractorKey,
+        projectCanonicalKeys: projectRows.map(project => project.canonicalKey)
+      },
       relatedEntityIds: projectRows.map(project => project.id),
       evidenceObservationIds: projectRows.flatMap(project =>
-        projectObservationRows(snapshot, project.id).map(obs => obs.id)
+        (observationIndex.get(project.id) ?? []).map(obs => obs.id)
       ),
       payload: {
         statement: "The same contractor identity key appears in multiple canonical project records.",
         contractorIdentityKey: contractorKey,
-        contractorIdentityBasis: contractorBasis,
-        contractorDisplayNames: [...new Set(projectRows.map(project => clean(project.data?.contractor)).filter(Boolean))].sort(),
+        contractorIdentityBasis: uniqueEntries[0].contractor.basis,
+        contractorDisplayNames: [...new Set(
+          projectRows.map(project => clean(project.data?.contractor)).filter(Boolean)
+        )].sort(),
         projects: projectRows.map(project => ({
           entityId: project.id,
           canonicalKey: project.canonicalKey,
@@ -269,7 +302,7 @@ export function findContractorPortfolios(snapshot) {
           contractId: project.data?.contractId ?? null,
           province: project.data?.location?.province ?? null,
           city: project.data?.location?.city ?? project.data?.location?.municipality ?? null
-        })).sort((a, b) => a.canonicalKey.localeCompare(b.canonicalKey))
+        }))
       }
     }));
   }
@@ -277,156 +310,213 @@ export function findContractorPortfolios(snapshot) {
   return findings;
 }
 
-function electionCanApplyAtPosition(data, projectLocation) {
-  const position = clean(data.position).toUpperCase();
+function createElectionIndexes(elections) {
+  const byCityYear = new Map();
+  const byProvinceYear = new Map();
 
-  if (MUNICIPAL_POSITIONS.has(position)) {
-    return Boolean(projectLocation.city && normalizePlace(data.city) === projectLocation.city);
-  }
+  for (const election of elections) {
+    const year = toNumber(election.data?.year);
+    if (!year) continue;
 
-  if (PROVINCIAL_POSITIONS.has(position)) {
-    return Boolean(projectLocation.province && normalizePlace(data.province) === projectLocation.province);
-  }
+    const position = clean(election.data?.position).toUpperCase();
 
-  return false;
-}
+    if (MUNICIPAL_POSITIONS.has(position)) {
+      const city = normalizePlace(election.data?.city);
+      if (city) {
+        const key = year + "::" + city;
+        const list = byCityYear.get(key) ?? [];
+        list.push(election);
+        byCityYear.set(key, list);
+      }
+    }
 
-function electionProjectJoinBasis(data, projectLocation) {
-  const position = clean(data.position).toUpperCase();
-
-  if (MUNICIPAL_POSITIONS.has(position) && projectLocation.city && normalizePlace(data.city) === projectLocation.city) {
-    return "city+election_year";
-  }
-
-  if (PROVINCIAL_POSITIONS.has(position) && projectLocation.province && normalizePlace(data.province) === projectLocation.province) {
-    return "province+election_year";
-  }
-
-  return null;
-}
-
-export function findElectionProjectOverlaps(snapshot) {
-  const findings = [];
-  const projects = projectEntities(snapshot);
-  const elections = electionEntities(snapshot);
-
-  for (const project of projects) {
-    const years = collectProjectYears(project);
-    if (!years.length) continue;
-
-    const projectLocation = getProjectLocation(project);
-    if (!projectLocation.city && !projectLocation.province) continue;
-
-    for (const election of elections) {
-      const electionYear = toNumber(election.data?.year);
-      if (!electionYear || !years.includes(electionYear)) continue;
-      if (!electionCanApplyAtPosition(election.data, projectLocation)) continue;
-
-      const joinBasis = electionProjectJoinBasis(election.data, projectLocation);
-      if (!joinBasis) continue;
-
-      const contractor = clean(project.data?.contractor) || null;
-      findings.push(baseFinding({
-        ruleId: "election-project-jurisdiction-overlap",
-        findingType: "ELECTION_PROJECT_OVERLAP",
-        status: "INFERENCE_LEAD",
-        subjectEntityId: election.id,
-        relatedEntityIds: [project.id],
-        evidenceObservationIds: [
-          ...projectObservationRows(snapshot, project.id).map(obs => obs.id),
-          ...projectObservationRows(snapshot, election.id).map(obs => obs.id)
-        ],
-        payload: {
-          statement: "An election record and a project share a jurisdiction at the applicable office level and have an overlapping recorded year.",
-          electionEntityId: election.id,
-          electionCanonicalKey: election.canonicalKey,
-          electionRecord: {
-            fullName: election.data?.fullName ?? election.data?.candidateName ?? null,
-            position: election.data?.position ?? null,
-            year: electionYear,
-            city: election.data?.city ?? null,
-            province: election.data?.province ?? null
-          },
-          projectEntityId: project.id,
-          projectCanonicalKey: project.canonicalKey,
-          projectRecord: {
-            contractId: project.data?.contractId ?? null,
-            description: project.data?.description ?? null,
-            contractor
-          },
-          projectYears: years,
-          joinBasis,
-          interpretationLimit: "Jurisdiction and time overlap do not establish a role in the project, influence, favoritism, conflict of interest, or causation."
-        }
-      }));
+    if (PROVINCIAL_POSITIONS.has(position)) {
+      const province = normalizePlace(election.data?.province);
+      if (province) {
+        const key = year + "::" + province;
+        const list = byProvinceYear.get(key) ?? [];
+        list.push(election);
+        byProvinceYear.set(key, list);
+      }
     }
   }
 
-  return findings;
+  return { byCityYear, byProvinceYear };
 }
 
-export function findElectionProjectContractorOverlaps(snapshot) {
-  const findings = [];
-  const projects = projectEntities(snapshot);
+function findElectionProjectPairs(snapshot) {
   const elections = electionEntities(snapshot);
+  const projects = projectEntities(snapshot);
+  const indexes = createElectionIndexes(elections);
+  const pairs = [];
 
   for (const project of projects) {
-    const contractor = clean(project.data?.contractor);
-    if (!contractor) continue;
-
     const years = collectProjectYears(project);
     if (!years.length) continue;
 
-    const projectLocation = getProjectLocation(project);
+    const location = getProjectLocation(project);
+    const matched = new Map();
 
-    for (const election of elections) {
-      const electionYear = toNumber(election.data?.year);
-      if (!electionYear || !years.includes(electionYear)) continue;
-      if (!electionCanApplyAtPosition(election.data, projectLocation)) continue;
+    if (location.city) {
+      for (const year of years) {
+        const key = year + "::" + location.city;
+        for (const election of indexes.byCityYear.get(key) ?? []) {
+          const prior = matched.get(election.id) ?? [];
+          prior.push(year);
+          matched.set(election.id, prior);
+        }
+      }
+    }
 
-      const joinBasis = electionProjectJoinBasis(election.data, projectLocation);
-      if (!joinBasis) continue;
+    if (location.province) {
+      for (const year of years) {
+        const key = year + "::" + location.province;
+        for (const election of indexes.byProvinceYear.get(key) ?? []) {
+          const prior = matched.get(election.id) ?? [];
+          prior.push(year);
+          matched.set(election.id, prior);
+        }
+      }
+    }
 
-      findings.push(baseFinding({
+    for (const [electionId, matchedYears] of matched) {
+      const election = snapshot.entities.find(entity => entity.id === electionId);
+      if (!election) continue;
+
+      const position = clean(election.data?.position).toUpperCase();
+      const electionCity = normalizePlace(election.data?.city);
+      const electionProvince = normalizePlace(election.data?.province);
+
+      const validCity =
+        MUNICIPAL_POSITIONS.has(position) &&
+        Boolean(location.city) &&
+        electionCity === location.city;
+
+      const validProvince =
+        PROVINCIAL_POSITIONS.has(position) &&
+        Boolean(location.province) &&
+        electionProvince === location.province;
+
+      if (!validCity && !validProvince) continue;
+
+      const joinBasis = validCity ? "city+election_year" : "province+election_year";
+      const uniqueYears = [...new Set(matchedYears)].sort((a, b) => a - b);
+      pairs.push({
+        election,
+        project,
+        matchedYears: uniqueYears,
+        joinBasis
+      });
+    }
+  }
+
+  return pairs.sort(
+    (a, b) =>
+      a.project.canonicalKey.localeCompare(b.project.canonicalKey) ||
+      a.election.canonicalKey.localeCompare(b.election.canonicalKey)
+  );
+}
+
+export function findElectionProjectOverlaps(snapshot, observationIndex = createObservationIndex(snapshot)) {
+  return findElectionProjectPairs(snapshot).map(({ election, project, matchedYears, joinBasis }) =>
+    baseFinding({
+      ruleId: "election-project-jurisdiction-overlap",
+      findingType: "ELECTION_PROJECT_OVERLAP",
+      status: "INFERENCE_LEAD",
+      dedupeKey: {
+        electionCanonicalKey: election.canonicalKey,
+        projectCanonicalKey: project.canonicalKey,
+        matchedYears,
+        joinBasis
+      },
+      subjectEntityId: election.id,
+      relatedEntityIds: [project.id],
+      evidenceObservationIds: [
+        ...(observationIndex.get(project.id) ?? []).map(obs => obs.id),
+        ...(observationIndex.get(election.id) ?? []).map(obs => obs.id)
+      ],
+      payload: {
+        statement: "An election record and a project share a jurisdiction at the applicable office level and have an overlapping recorded year.",
+        election: {
+          canonicalKey: election.canonicalKey,
+          entityId: election.id,
+          fullName: election.data?.fullName ?? election.data?.candidateName ?? null,
+          position: election.data?.position ?? null,
+          year: toNumber(election.data?.year),
+          city: election.data?.city ?? null,
+          province: election.data?.province ?? null
+        },
+        project: {
+          canonicalKey: project.canonicalKey,
+          entityId: project.id,
+          contractId: project.data?.contractId ?? null,
+          description: project.data?.description ?? null
+        },
+        matchedYears,
+        joinBasis,
+        interpretationLimit: "Jurisdiction and time overlap do not establish a role in the project, influence, favoritism, conflict of interest, or causation."
+      }
+    })
+  );
+}
+
+export function findElectionProjectContractorOverlaps(snapshot, observationIndex = createObservationIndex(snapshot)) {
+  return findElectionProjectPairs(snapshot)
+    .filter(({ project }) => clean(project.data?.contractor))
+    .map(({ election, project, matchedYears, joinBasis }) => {
+      const contractor = contractorIdentity(project);
+
+      return baseFinding({
         ruleId: "election-project-contractor-intersection",
         findingType: "ELECTION_PROJECT_CONTRACTOR_INTERSECTION",
         status: "INFERENCE_LEAD",
+        dedupeKey: {
+          electionCanonicalKey: election.canonicalKey,
+          projectCanonicalKey: project.canonicalKey,
+          contractorIdentityKey: contractor?.key ?? null,
+          matchedYears,
+          joinBasis
+        },
         subjectEntityId: election.id,
         relatedEntityIds: [project.id],
         evidenceObservationIds: [
-          ...projectObservationRows(snapshot, project.id).map(obs => obs.id),
-          ...projectObservationRows(snapshot, election.id).map(obs => obs.id)
+          ...(observationIndex.get(project.id) ?? []).map(obs => obs.id),
+          ...(observationIndex.get(election.id) ?? []).map(obs => obs.id)
         ],
         payload: {
           statement: "An election record, project and named contractor intersect on documented jurisdiction and year.",
-          joinBasis,
           election: {
             canonicalKey: election.canonicalKey,
+            entityId: election.id,
             fullName: election.data?.fullName ?? election.data?.candidateName ?? null,
             position: election.data?.position ?? null,
-            year: electionYear
+            year: toNumber(election.data?.year)
           },
           project: {
             canonicalKey: project.canonicalKey,
+            entityId: project.id,
             contractId: project.data?.contractId ?? null,
             description: project.data?.description ?? null,
-            contractor
+            contractor: project.data?.contractor ?? null,
+            contractorIdentityKey: contractor?.key ?? null,
+            contractorIdentityBasis: contractor?.basis ?? null
           },
+          matchedYears,
+          joinBasis,
           interpretationLimit: "This is an intersection lead only. It does not establish any relationship between the office-holder and contractor beyond the shared project context."
         }
-      }));
-    }
-  }
-
-  return findings;
+      });
+    });
 }
 
 export function runCorrelationRules(snapshot) {
+  const observationIndex = createObservationIndex(snapshot);
+
   return [
-    ...findProjectStatusHistories(snapshot),
-    ...findProjectSourceDivergence(snapshot),
-    ...findContractorPortfolios(snapshot),
-    ...findElectionProjectOverlaps(snapshot),
-    ...findElectionProjectContractorOverlaps(snapshot)
+    ...findProjectStatusHistories(snapshot, observationIndex),
+    ...findProjectSourceDivergence(snapshot, observationIndex),
+    ...findContractorPortfolios(snapshot, observationIndex),
+    ...findElectionProjectOverlaps(snapshot, observationIndex),
+    ...findElectionProjectContractorOverlaps(snapshot, observationIndex)
   ];
 }
