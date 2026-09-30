@@ -31,9 +31,11 @@ export function runEntityResolution({ snapshot, maxCandidates } = {}) {
       autoConfirmedCount: autoConfirmed,
       reviewRequiredCount: reviewRequired,
       conflictCount: conflicts,
+      clusterCount: (result.clusters || []).length,
       errors: []
     },
-    candidates: result.candidates
+    candidates: result.candidates,
+    clusters: result.clusters || []
   };
 }
 
@@ -79,12 +81,22 @@ export async function executeEntityResolutionRun({ store, maxCandidates } = {}) 
       }
     }
 
+    if (typeof store.insertEntityResolutionCluster !== "function") {
+      throw new Error("Entity-resolution store is missing cluster persistence support.");
+    }
+
+    const clusters = result.clusters || [];
+    for (const cluster of clusters) {
+      await store.insertEntityResolutionCluster(runId, cluster);
+    }
+
     return await store.completeEntityResolutionRun(runId, {
       entityCount: result.run.entityCount,
       candidateCount: result.run.candidateCount,
       autoConfirmedCount: result.run.autoConfirmedCount,
       reviewRequiredCount: result.run.reviewRequiredCount,
       conflictCount: result.run.conflictCount,
+      clusterCount: clusters.length,
       errors: []
     });
   } catch (error) {
