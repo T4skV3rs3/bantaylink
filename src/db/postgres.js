@@ -404,6 +404,32 @@ export function createPostgresStore(pool) {
       return result.rows[0];
     },
 
+    async insertEntityResolutionCluster(runId, cluster) {
+      const id = cluster.id || (runId + ":" + cluster.clusterKey);
+      const result = await pool.query(
+        \`INSERT INTO entity_resolution_clusters
+          (id, entity_resolution_run_id, entity_type, cluster_key,
+           representative_entity_id, member_entity_ids, status, basis)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)
+         ON CONFLICT (entity_resolution_run_id, cluster_key) DO UPDATE
+           SET representative_entity_id=EXCLUDED.representative_entity_id,
+               member_entity_ids=EXCLUDED.member_entity_ids,
+               status=EXCLUDED.status,
+               basis=EXCLUDED.basis
+         RETURNING id, entity_resolution_run_id AS "entityResolutionRunId",
+                   entity_type AS "entityType", cluster_key AS "clusterKey",
+                   representative_entity_id AS "representativeEntityId",
+                   member_entity_ids AS "memberEntityIds", status, basis,
+                   created_at AS "createdAt"\`,
+        [
+          id, runId, cluster.entityType, cluster.clusterKey,
+          cluster.representativeEntityId, cluster.memberEntityIds,
+          cluster.status, JSON.stringify(cluster.basis ?? {})
+        ]
+      );
+      return result.rows[0];
+    },
+
     async completeEntityResolutionRun(id, patch) {
       const result = await pool.query(
         `UPDATE entity_resolution_runs
