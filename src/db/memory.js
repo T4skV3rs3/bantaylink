@@ -7,6 +7,8 @@ export class MemoryStore {
     this.entityByKey = new Map();
     this.observations = new Map();
     this.edges = new Map();
+    this.observationOccurrences = new Map();
+    this.edgeOccurrences = new Map();
   }
 
   async startRun(input) {
@@ -15,6 +17,7 @@ export class MemoryStore {
       adapterId: input.adapterId,
       sourceId: input.sourceId ?? null,
       sourceVersion: input.sourceVersion ?? null,
+      sourceSnapshot: input.sourceSnapshot ?? {},
       status: "running",
       recordsSeen: 0,
       recordsInserted: 0,
@@ -32,17 +35,25 @@ export class MemoryStore {
     return run;
   }
 
-  async failRun(id, error) {
+  async failRun(id, error, errors = null) {
     const run = this.runs.get(id);
     run.status = "failed";
-    run.errors.push(String(error?.message ?? error));
+    run.errors = Array.isArray(errors)
+      ? [...errors]
+      : [...run.errors, String(error?.message ?? error)];
     return run;
   }
 
   async upsertSource(source) {
     const key = source.sourceKey;
     const existing = this.sources.get(key);
-    if (existing) return existing;
+    if (existing) {
+      existing.name = source.name;
+      existing.sourceClass = source.sourceClass;
+      existing.publisher = source.publisher ?? null;
+      existing.canonicalUrl = source.canonicalUrl;
+      return existing;
+    }
     const value = {
       id: source.id,
       sourceKey: key,
@@ -56,8 +67,8 @@ export class MemoryStore {
   }
 
   async insertRawDocument(doc) {
-    this.rawDocuments.set(doc.id, doc);
-    return doc;
+    this.rawDocuments.set(doc.id, { ...doc, responseHeaders: { ...(doc.responseHeaders ?? {}) } });
+    return this.rawDocuments.get(doc.id);
   }
 
   async upsertEntity(entity) {
@@ -90,8 +101,14 @@ export class MemoryStore {
       const existingKey = `${item.sourceId}::${item.sourceRecordId}::${item.contentHash}`;
       if (existingKey === key) return { inserted: false, observation: item };
     }
-    this.observations.set(observation.id, observation);
-    return { inserted: true, observation };
+    const value = { ...observation };
+    this.observations.set(value.id, value);
+    return { inserted: true, observation: value };
+  }
+
+  async linkObservationOccurrence(link) {
+    const key = `${link.observationId}::${link.ingestionRunId}::${link.rawDocumentId}`;
+    this.observationOccurrences.set(key, { ...link });
   }
 
   async insertEdge(edge) {
@@ -100,8 +117,14 @@ export class MemoryStore {
       const existingKey = `${item.sourceId}::${item.sourceRecordId}::${item.contentHash}`;
       if (existingKey === key) return { inserted: false, edge: item };
     }
-    this.edges.set(edge.id, edge);
-    return { inserted: true, edge };
+    const value = { ...edge };
+    this.edges.set(value.id, value);
+    return { inserted: true, edge: value };
+  }
+
+  async linkEdgeOccurrence(link) {
+    const key = `${link.edgeId}::${link.ingestionRunId}::${link.rawDocumentId}`;
+    this.edgeOccurrences.set(key, { ...link });
   }
 
   async getCorrelationSnapshot() {
