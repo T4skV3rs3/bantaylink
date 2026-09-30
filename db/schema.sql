@@ -258,11 +258,17 @@ CREATE TABLE IF NOT EXISTS entity_resolution_runs (
   auto_confirmed_count INTEGER NOT NULL DEFAULT 0,
   review_required_count INTEGER NOT NULL DEFAULT 0,
   conflict_count INTEGER NOT NULL DEFAULT 0,
+  cluster_count INTEGER NOT NULL DEFAULT 0,
   errors JSONB NOT NULL DEFAULT '[]'::jsonb
 );
 
+
 CREATE INDEX IF NOT EXISTS idx_entity_resolution_runs_status
   ON entity_resolution_runs(status, completed_at DESC);
+
+ALTER TABLE entity_resolution_runs
+  ADD COLUMN IF NOT EXISTS cluster_count INTEGER NOT NULL DEFAULT 0;
+
 
 CREATE TABLE IF NOT EXISTS entity_resolution_candidates (
   id TEXT PRIMARY KEY,
