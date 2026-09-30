@@ -35,6 +35,7 @@ export default async function handler(req, res) {
   const edgeIdList = ids(req.query?.edgeIds || req.query?.edges);
   const entityId = clean(req.query?.entityId);
   const canonicalKey = clean(req.query?.canonicalKey);
+  const entityType = clean(req.query?.entityType, 50);
   const findingId = clean(req.query?.findingId);
   const candidateId = clean(req.query?.candidateId);
   const includeRaw = truthy(req.query?.includeRaw);
@@ -56,11 +57,12 @@ export default async function handler(req, res) {
 
     if (canonicalKey) {
       const result = await pool.query(
-        "SELECT id FROM entities WHERE canonical_key=$1 ORDER BY last_seen_at DESC LIMIT 1",
-        [canonicalKey]
+        "SELECT id FROM entities WHERE canonical_key=$1 AND ($2::text='' OR entity_type=$2) " +
+        "ORDER BY last_seen_at DESC",
+        [canonicalKey, entityType]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Entity not found." });
-      targetEntityIds.push(result.rows[0].id);
+      targetEntityIds.push(...result.rows.map(row => row.id));
     }
 
     if (findingId) {
