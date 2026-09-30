@@ -6,6 +6,8 @@ const WINNER_DATASET = "NLE_Winners_2004-2025";
 const MAX_EVIDENCE_IDS_PER_ENTITY = 200;
 const MAX_NAME_VARIANTS = 6;
 const MAX_BLOCK_COMPARISONS = 200000;
+const MAX_PERSON_BLOCK_SIZE = 5000;
+const MAX_ORGANIZATION_BLOCK_SIZE = 5000;
 
 const ENTITY_TYPES = new Set([
   "project",
@@ -533,10 +535,24 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
   for (const entity of entities) {
     const descriptor = personDescriptor(entity);
     if (!descriptor) continue;
+
     for (const name of descriptor.names) {
-      const list = people.get(name) ?? [];
-      list.push({ entity, descriptor });
-      people.set(name, list);
+      const keys = new Set();
+      if (descriptor.city && descriptor.province) {
+        keys.add("loc:" + name + "::" + descriptor.city + "::" + descriptor.province);
+      }
+      if (descriptor.province) {
+        keys.add("prov:" + name + "::" + descriptor.province);
+      }
+      if (descriptor.position && descriptor.year != null) {
+        keys.add("office-year:" + name + "::" + descriptor.position + "::" + descriptor.year);
+      }
+
+      for (const key of keys) {
+        const list = people.get(key) ?? [];
+        list.push({ entity, descriptor, name });
+        people.set(key, list);
+      }
     }
   }
 
@@ -560,45 +576,50 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
   let comparisons = 0;
   let blockedTruncated = false;
 
-  for (const sourceEntity of entities) {
-    for (const external of stableExternalIdentifiers(sourceEntity)) {
-      for (const peer of stable.get(external.key) ?? []) {
-        if (peer.entity.id === sourceEntity.id) continue;
-        const pair = sourceEntity.canonicalKey.localeCompare(peer.entity.canonicalKey) <= 0
-          ? [sourceEntity, peer.entity]
-          : [peer.entity, sourceEntity];
+  for (const [stableKey, group] of [...stable.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    const orderedGroup = [...group]
+      .sort((a, b) => a.entity.canonicalKey.localeCompare(b.entity.canonicalKey));
+    const representative = orderedGroup[0];
+    const external = representative.external;
 
-        const sourceData = pair[0].data ?? {};
-        const targetData = pair[1].data ?? {};
-        const sourceName = normalizeName(sourceData.fullName ?? sourceData.name ?? sourceData.legalName ?? sourceData.contractor ?? sourceData.awardee);
-        const targetName = normalizeName(targetData.fullName ?? targetData.name ?? targetData.legalName ?? targetData.contractor ?? targetData.awardee);
+    for (const peer of orderedGroup.slice(1)) {
+      const pair = [representative.entity, peer.entity];
+      const sourceData = pair[0].data ?? {};
+      const targetData = pair[1].data ?? {};
+      const sourceName = normalizeName(sourceData.fullName ?? sourceData.name ?? sourceData.legalName ?? sourceData.contractor ?? sourceData.awardee);
+      const targetName = normalizeName(targetData.fullName ?? targetData.name ?? targetData.legalName ?? targetData.contractor ?? targetData.awardee);
 
-        push(makeCandidate({
-          a: pair[0],
-          b: pair[1],
-          entityType: external.identityType,
-          identityGroupKey: external.key,
-          matchMethod: external.namespace,
-          status: "AUTO_CONFIRMED",
-          rationale: "The source records expose the same typed stable external identifier. The identifier match is automatic; any descriptive-field differences remain visible for review.",
-          evidenceObservationIds: pairEvidence(obsIndex, pair[0], pair[1]),
-          payload: {
-            identityType: external.identityType,
-            identityScope: "entity_identity",
-            identifierNamespace: external.namespace,
-            identifierValue: external.value,
-            sourceEntityType: pair[0].entityType,
-            candidateEntityType: pair[1].entityType,
-            normalizedNameMatch: Boolean(sourceName && targetName && sourceName === targetName),
-            nameDifference: Boolean(sourceName && targetName && sourceName !== targetName)
-          }
-        }));
-      }
+      push(makeCandidate({
+        a: pair[0],
+        b: pair[1],
+        entityType: external.identityType,
+        identityGroupKey: stableKey,
+        matchMethod: external.namespace,
+        status: "AUTO_CONFIRMED",
+        rationale: "The source records expose the same typed stable external identifier. The identifier match is automatic; any descriptive-field differences remain visible for review.",
+        evidenceObservationIds: pairEvidence(obsIndex, pair[0], pair[1]),
+        payload: {
+          identityType: external.identityType,
+          identityScope: "entity_identity",
+          identifierNamespace: external.namespace,
+          identifierValue: external.value,
+          sourceEntityType: pair[0].entityType,
+          candidateEntityType: pair[1].entityType,
+          normalizedNameMatch: Boolean(sourceName && targetName && sourceName === targetName),
+          nameDifference: Boolean(sourceName && targetName && sourceName !== targetName),
+          groupSize: orderedGroup.length
+        }
+      }));
     }
+  }
 
+  for (const sourceEntity of entities) {
     const organization = organizationDescriptor(sourceEntity);
     if (organization) {
-      for (const peer of organizations.get(organization.name) ?? []) {
+      const organizationPeers = organizations.get(organization.name) ?? [];
+      if (organizationPeers.length > MAX_ORGANIZATION_BLOCK_SIZE) continue;
+
+      for (const peer of organizationPeers) {
         if (peer.entity.id === sourceEntity.id) continue;
         const pair = ordered(sourceEntity, peer.entity);
         if (pair[0].id !== sourceEntity.id) continue;
@@ -650,9 +671,19 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
 
     const person = personDescriptor(sourceEntity);
     if (person) {
-      const peersSeen = new Set();
+      const candidateKeys = new Set();
       for (const name of person.names) {
-        for (const peer of people.get(name) ?? []) {
+        if (person.city && person.province) candidateKeys.add("loc:" + name + "::" + person.city + "::" + person.province);
+        if (person.province) candidateKeys.add("prov:" + name + "::" + person.province);
+        if (person.position && person.year != null) candidateKeys.add("office-year:" + name + "::" + person.position + "::" + person.year);
+      }
+
+      const peersSeen = new Set();
+      for (const key of candidateKeys) {
+        const peerBlock = people.get(key) ?? [];
+        if (peerBlock.length > MAX_PERSON_BLOCK_SIZE) continue;
+
+        for (const peer of peerBlock) {
           if (peer.entity.id === sourceEntity.id || peersSeen.has(peer.entity.id)) continue;
           peersSeen.add(peer.entity.id);
 
@@ -674,7 +705,7 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
             payload: {
               identityType: "person",
               identityScope: "name_context",
-              sharedNameVariant: name,
+              sharedNameVariant: peer.name,
               sourceNames: person.names,
               candidateNames: peer.descriptor.names,
               sourceStructuredNameKey: person.structuredNameKey,
@@ -684,7 +715,8 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
               positionMatch: context.samePosition,
               sexMatch: context.sameSex,
               sexConflict: context.sexConflict,
-              yearGap: context.yearGap
+              yearGap: context.yearGap,
+              blockKey: key
             }
           }));
         }
