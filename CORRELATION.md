@@ -46,7 +46,7 @@ The procurement link payload includes the exact identifier join basis and any di
 
 ## Deliberate exclusions
 
-The v0.5 engine does not:
+The v0.6 engine does not:
 - infer family relationships from names;
 - merge people across election records;
 - treat OpenHalalan vote-count rows as winner/person records for election/project joins;
@@ -78,9 +78,9 @@ Finding IDs are run-scoped. Fingerprints are deterministic from stable entity/so
 
 The election/project join uses jurisdiction+year indexes rather than a full project-by-election cross product.
 
-PostgreSQL correlation snapshots only load project entities and election-result entities other than the OpenHalalan vote-count dataset. Their relevant observations and connected source-backed edges are fetched with the entity IDs.
+PostgreSQL correlation snapshots load project entities and election-result entities other than the OpenHalalan vote-count dataset, then add only procurement events whose normalized reference number exactly matches a project contract ID. Relevant observations and connected source-backed edges are fetched with the entity IDs.
 
-This avoids loading millions of vote-count rows into a v0.5 jurisdiction join.
+This avoids loading millions of vote-count rows into the correlation join.
 
 ## Version 1 direction
 
