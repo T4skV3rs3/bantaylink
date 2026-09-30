@@ -33,15 +33,15 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md), [ADAPTERS.md](./ADAPTERS.md), and [SOU
 
 ## Correlation engine v0.5
 
-The v0.5 correlation engine produces source-referenced findings without mutating source-backed edges. It detects project status histories, multi-source project observations, contractor project portfolios, and election/project jurisdiction-year intersections. Intersections are labeled \`INFERENCE_LEAD\`; the engine does not infer causation, misconduct, or political relationships.
+The v0.5 correlation engine produces source-referenced findings without mutating source-backed edges. It detects project status histories, multi-source project observations, contractor project portfolios, and election/project jurisdiction-year intersections. Intersections are labeled `INFERENCE_LEAD`; the engine does not infer causation, misconduct, or political relationships.
 
 Run the engine after the provenance database is initialized and populated:
 
-\`\`\`bash
+```bash
 npm run correlate
-\`\`\`
+```
 
-Use \`BANTAYLINK_MAX_FINDINGS\` to bound a run for testing.
+Use `BANTAYLINK_MAX_FINDINGS` to bound a run for testing.
 
 ## Source ingestion
 
