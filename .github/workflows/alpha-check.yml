@@ -51,23 +51,18 @@ jobs:
           test -f src/adapters/philgeps.js
           test -f scripts/test-adapters.mjs
           test -f scripts/ingest-source.mjs
-          test -f src/entity-resolution/engine.js
           test -f src/entity-resolution/rules.js
+          test -f src/entity-resolution/engine.js
           test -f scripts/test-entity-resolution.mjs
+          test -f api/entities.js
+          test -f api/entity.js
           test -f api/evidence.js
           test -f api/entity-resolution.js
           test -f src/correlation/engine.js
           test -f src/correlation/rules.js
           test -f scripts/test-correlation.mjs
           test -f scripts/run-correlation.mjs
-          test -f api/correlations.js
-          test -f api/entities.js
-          test -f api/entity.js
-          test -f api/evidence.js
-          test -f api/entity-resolution.js
-          test -f src/entity-resolution/rules.js
-          test -f src/entity-resolution/engine.js
-          test -f scripts/test-entity-resolution.mjs
+          test -f index.html
 
       - name: Syntax-check ingestion and correlation code
         run: |
@@ -87,21 +82,14 @@ jobs:
           node --check src/entity-resolution/engine.js
           node --check api/evidence.js
           node --check api/entity-resolution.js
+          node --check api/entities.js
+          node --check api/entity.js
           node --check scripts/test-entity-resolution.mjs
           node --check src/correlation/rules.js
           node --check src/correlation/engine.js
-          node --check src/db/postgres.js
           node --check scripts/test-correlation.mjs
           node --check scripts/run-correlation.mjs
           node --check api/correlations.js
-          node --check api/entities.js
-          node --check api/entity.js
-          node --check api/evidence.js
-          node --check api/entity-resolution.js
-          node --check src/entity-resolution/rules.js
-          node --check src/entity-resolution/engine.js
-          node --check scripts/test-entity-resolution.mjs
-          node --check scripts/run-entity-resolution.mjs
 
       - name: Validate JSON
         run: |
@@ -119,4 +107,6 @@ jobs:
           grep -q "Infrastructure watch" index.html
           grep -q "Political families" index.html
           grep -q "Correlations" index.html
+          grep -q "Evidence" index.html
+          grep -q "Entity resolution" index.html
           echo "BantayLink alpha smoke checks passed."
