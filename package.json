@@ -1,6 +1,6 @@
 {
   "name": "bantaylink",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,8 +13,7 @@
     "correlate": "node scripts/run-correlation.mjs",
     "db:init": "node scripts/init-db.mjs",
     "resolve:entities": "node scripts/run-entity-resolution.mjs",
-    "test:entity-resolution": "node scripts/test-entity-resolution.mjs",
-    "resolve": "node scripts/run-entity-resolution.mjs"
+    "test:entity-resolution": "node scripts/test-entity-resolution.mjs"
   },
   "dependencies": {
     "pg": "^8.16.3"
