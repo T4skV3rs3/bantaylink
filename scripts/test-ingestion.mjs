@@ -46,10 +46,55 @@ if (store.entities.size !== seed.records.length) throw new Error("Entity dedupli
 if (store.observations.size !== seed.records.length) throw new Error("Observation count mismatch.");
 if (store.rawDocuments.size !== seed.records.length * 2) throw new Error("Raw retrieval history was not retained.");
 if (store.observationOccurrences.size !== seed.records.length * 2) throw new Error("Repeat-run occurrence links were not retained.");
+const rawDocuments = [...store.rawDocuments.values()];
+if (!rawDocuments.every(document => document.payload && typeof document.payload === "object")) {
+  throw new Error("Structured seed payload was not retained as JSON evidence.");
+}
 if (second.recordsSkipped !== seed.records.length) throw new Error("Repeat ingestion should be fully deduplicated.");
 
 const sourceSnapshot = first.sourceSnapshot;
 if (sourceSnapshot.api_key !== "[REDACTED]") throw new Error("Source snapshot secret redaction failed.");
+
+const rawBodyStore = new MemoryStore();
+const rawBody = "<html><body>Exact evidence body</body></html>";
+const rawBodyAdapter = {
+  id: "test-raw-body",
+  name: "Test Raw Body",
+  source: {
+    sourceKey: "test-raw-body",
+    name: "Test Raw Body",
+    sourceClass: "official_document",
+    canonicalUrl: "https://example.invalid/raw"
+  },
+  async *fetch() {
+    yield {
+      payload: { title: "Exact evidence body" },
+      rawContent: rawBody,
+      hashScope: "raw_content",
+      mimeType: "text/html",
+      url: "https://example.invalid/raw?token=secret"
+    };
+  },
+  normalize(record) {
+    return {
+      entities: [{
+        entityType: "source",
+        canonicalKey: "test-raw",
+        label: record.title,
+        data: record,
+        observations: [{
+          recordType: "official_document",
+          sourceRecordId: "test-raw",
+          data: record
+        }]
+      }]
+    };
+  }
+};
+await ingestAdapter({ adapter: rawBodyAdapter, store: rawBodyStore });
+const storedRawBody = [...rawBodyStore.rawDocuments.values()][0];
+if (storedRawBody.payload !== rawBody) throw new Error("Exact raw response body was not retained.");
+if (storedRawBody.hashScope !== "raw_content") throw new Error("Raw body hash scope was not retained.");
 
 const partialStore = new MemoryStore();
 const partialAdapter = {
