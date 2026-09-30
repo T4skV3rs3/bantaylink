@@ -4,10 +4,15 @@
     "election_result",
     "family_relationship",
     "project",
+    "contractor",
+    "organization",
     "procurement_event",
     "audit_finding",
     "source",
     "edge",
+    "entity_resolution_identity_record",
+    "entity_resolution_candidate",
+    "entity_resolution_cluster",
     "correlation_finding"
   ],
   "evidence_classes": [
@@ -23,6 +28,7 @@
     "located_in",
     "procured_by",
     "contracted_to",
+    "awarded_to",
     "documented_by",
     "overlaps_in_time",
     "correlation_lead"
