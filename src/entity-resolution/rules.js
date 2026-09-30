@@ -696,11 +696,11 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
     comparisons += 1;
     if (comparisons > MAX_BLOCK_COMPARISONS) {
       blockedTruncated = true;
-      return;
+      return false;
     }
 
     const context = projectContextMatch(a, b);
-    if (!context.valid) return;
+    if (!context.valid) return true;
 
     const pair = ordered(a.entity, b.entity);
     push(makeCandidate({
@@ -720,26 +720,9 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
         ...context
       }
     }));
+    return true;
   }
 
-  const seenProjectPairs = new Set();
-  for (const project of projects) {
-    for (const key of blockKeys(project)) {
-      const peers = projectBlocks.get(key) ?? [];
-      for (const peer of peers) {
-        if (peer.entity.id === project.entity.id) continue;
-        const pair = ordered(project.entity, peer.entity);
-        const pairKey = pair[0].id + "::" + pair[1].id;
-        if (seenProjectPairs.has(pairKey)) continue;
-        seenProjectPairs.add(pairKey);
-        compareDescriptorPair(pair, pair, "project_context_candidate");
-      }
-    }
-  }
-
-  // The helper above receives entity-ordered arguments, so make a second safe pass
-  // over unique pairs created by the block index. This keeps comparisons deterministic
-  // while avoiding an all-projects cross product.
   const projectPairs = new Map();
   for (const project of projects) {
     for (const key of blockKeys(project)) {
@@ -747,31 +730,15 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
         if (peer.entity.id === project.entity.id) continue;
         const pair = ordered(project.entity, peer.entity);
         const pairKey = pair[0].id + "::" + pair[1].id;
-        if (!projectPairs.has(pairKey)) projectPairs.set(pairKey, [pair[0], pair[1]]);
+        if (!projectPairs.has(pairKey)) projectPairs.set(pairKey, pair.map(entity => projectDescriptor(entity)));
       }
     }
   }
-  // Remove any candidates accidentally made by the first pass; only the safe pair map
-  // is authoritative for project/procurement context matching.
-  const projectCandidateFingerprints = new Set(
-    candidates
-      .filter(item => item.matchMethod === "project_context_candidate")
-      .map(item => item.fingerprint)
-  );
-  for (const fingerprint of projectCandidateFingerprints) seen.delete(fingerprint);
 
-  // Since candidates are an output array, rebuild the context candidates without the
-  // accidental first pass by filtering them before adding the authoritative pairs.
-  for (let i = candidates.length - 1; i >= 0; i -= 1) {
-    if (candidates[i].matchMethod === "project_context_candidate") candidates.splice(i, 1);
-  }
-  for (const [pairKey, [a, b]] of [...projectPairs.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+  for (const [pairKey, pair] of [...projectPairs.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     void pairKey;
-    compareDescriptorPair(
-      projectDescriptor(a),
-      projectDescriptor(b),
-      "project_context_candidate"
-    );
+    if (!pair[0] || !pair[1]) continue;
+    if (!compareDescriptorPair(pair[0], pair[1], "project_context_candidate") && blockedTruncated) break;
   }
 
   const procurementPairs = new Map();
@@ -786,30 +753,7 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
 
   for (const [pairKey, [project, event]] of [...procurementPairs.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     void pairKey;
-    comparisons += 1;
-    if (comparisons > MAX_BLOCK_COMPARISONS) {
-      blockedTruncated = true;
-      break;
-    }
-    const context = projectContextMatch(project, event);
-    if (!context.valid) continue;
-
-    const pair = ordered(project.entity, event.entity);
-    push(makeCandidate({
-      a: pair[0],
-      b: pair[1],
-      entityType: "project_procurement",
-      matchMethod: "project_procurement_context_candidate",
-      status: "REVIEW_REQUIRED",
-      rationale: "The project and procurement record have strongly similar descriptions plus at least one shared jurisdiction, year, or amount signal. This is a crosswalk candidate and does not by itself establish that the procurement event is the same project.",
-      evidenceObservationIds: pairEvidence(obsIndex, pair[0], pair[1]),
-      payload: {
-        identityScope: "cross_source_context",
-        projectTitle: project.title,
-        procurementTitle: event.title,
-        ...context
-      }
-    }));
+    if (!compareDescriptorPair(project, event, "project_procurement_context_candidate") && blockedTruncated) break;
   }
 
   candidates.sort((a, b) =>
