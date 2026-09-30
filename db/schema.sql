@@ -254,15 +254,51 @@ CREATE TABLE IF NOT EXISTS entity_resolution_runs (
   started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   completed_at TIMESTAMPTZ,
   entity_count INTEGER NOT NULL DEFAULT 0,
+  identity_record_count INTEGER NOT NULL DEFAULT 0,
   candidate_count INTEGER NOT NULL DEFAULT 0,
   auto_confirmed_count INTEGER NOT NULL DEFAULT 0,
   review_required_count INTEGER NOT NULL DEFAULT 0,
   conflict_count INTEGER NOT NULL DEFAULT 0,
+  cluster_count INTEGER NOT NULL DEFAULT 0,
+  truncated BOOLEAN NOT NULL DEFAULT FALSE,
+  comparison_count INTEGER NOT NULL DEFAULT 0,
   errors JSONB NOT NULL DEFAULT '[]'::jsonb
 );
 
+ALTER TABLE entity_resolution_runs
+  ADD COLUMN IF NOT EXISTS identity_record_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE entity_resolution_runs
+  ADD COLUMN IF NOT EXISTS cluster_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE entity_resolution_runs
+  ADD COLUMN IF NOT EXISTS truncated BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE entity_resolution_runs
+  ADD COLUMN IF NOT EXISTS comparison_count INTEGER NOT NULL DEFAULT 0;
+
 CREATE INDEX IF NOT EXISTS idx_entity_resolution_runs_status
   ON entity_resolution_runs(status, completed_at DESC);
+
+CREATE TABLE IF NOT EXISTS entity_resolution_identity_records (
+  id TEXT PRIMARY KEY,
+  entity_resolution_run_id TEXT NOT NULL REFERENCES entity_resolution_runs(id) ON DELETE CASCADE,
+  identity_type TEXT NOT NULL,
+  entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  source_id TEXT REFERENCES sources(id) ON DELETE SET NULL,
+  source_record_id TEXT NOT NULL,
+  identity_key TEXT,
+  normalized_name TEXT,
+  locality_key TEXT,
+  external_id TEXT,
+  data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(entity_resolution_run_id, entity_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_resolution_identity_records_run
+  ON entity_resolution_identity_records(entity_resolution_run_id);
+CREATE INDEX IF NOT EXISTS idx_entity_resolution_identity_records_entity
+  ON entity_resolution_identity_records(entity_id);
+CREATE INDEX IF NOT EXISTS idx_entity_resolution_identity_records_key
+  ON entity_resolution_identity_records(identity_key);
 
 CREATE TABLE IF NOT EXISTS entity_resolution_candidates (
   id TEXT PRIMARY KEY,
@@ -282,21 +318,17 @@ CREATE TABLE IF NOT EXISTS entity_resolution_candidates (
   UNIQUE(entity_resolution_run_id, fingerprint)
 );
 
-CREATE INDEX IF NOT EXISTS idx_entity_resolution_candidates_run
-  ON entity_resolution_candidates(entity_resolution_run_id);
-
-CREATE INDEX IF NOT EXISTS idx_entity_resolution_candidates_source
-  ON entity_resolution_candidates(source_entity_id);
-
-CREATE INDEX IF NOT EXISTS idx_entity_resolution_candidates_candidate
-  ON entity_resolution_candidates(candidate_entity_id);
-
 ALTER TABLE entity_resolution_candidates
   ADD COLUMN IF NOT EXISTS identity_group_key TEXT;
 
+CREATE INDEX IF NOT EXISTS idx_entity_resolution_candidates_run
+  ON entity_resolution_candidates(entity_resolution_run_id);
+CREATE INDEX IF NOT EXISTS idx_entity_resolution_candidates_source
+  ON entity_resolution_candidates(source_entity_id);
+CREATE INDEX IF NOT EXISTS idx_entity_resolution_candidates_candidate
+  ON entity_resolution_candidates(candidate_entity_id);
 CREATE INDEX IF NOT EXISTS idx_entity_resolution_candidates_status
   ON entity_resolution_candidates(status);
-
 CREATE INDEX IF NOT EXISTS idx_entity_resolution_candidates_group
   ON entity_resolution_candidates(identity_group_key);
 
@@ -315,16 +347,10 @@ CREATE TABLE IF NOT EXISTS entity_resolution_assertions (
 
 CREATE INDEX IF NOT EXISTS idx_entity_resolution_assertions_source
   ON entity_resolution_assertions(source_entity_id);
-
 CREATE INDEX IF NOT EXISTS idx_entity_resolution_assertions_canonical
   ON entity_resolution_assertions(canonical_entity_id);
-
-ALTER TABLE entity_resolution_assertions
-  ADD COLUMN IF NOT EXISTS identity_group_key TEXT;
-
 CREATE INDEX IF NOT EXISTS idx_entity_resolution_assertions_type
   ON entity_resolution_assertions(assertion_type);
-
 CREATE INDEX IF NOT EXISTS idx_entity_resolution_assertions_group
   ON entity_resolution_assertions(identity_group_key);
 
@@ -343,14 +369,10 @@ CREATE TABLE IF NOT EXISTS entity_resolution_clusters (
 
 CREATE INDEX IF NOT EXISTS idx_entity_resolution_clusters_run
   ON entity_resolution_clusters(entity_resolution_run_id);
-
 CREATE INDEX IF NOT EXISTS idx_entity_resolution_clusters_representative
   ON entity_resolution_clusters(representative_entity_id);
-
 CREATE INDEX IF NOT EXISTS idx_entity_resolution_clusters_type
   ON entity_resolution_clusters(entity_type);
-
-
 
 CREATE OR REPLACE FUNCTION bantaylink_prevent_resolution_assertion_mutation()
 RETURNS trigger
@@ -365,4 +387,3 @@ DROP TRIGGER IF EXISTS entity_resolution_assertions_append_only ON entity_resolu
 CREATE TRIGGER entity_resolution_assertions_append_only
 BEFORE UPDATE OR DELETE ON entity_resolution_assertions
 FOR EACH ROW EXECUTE FUNCTION bantaylink_prevent_resolution_assertion_mutation();
-
