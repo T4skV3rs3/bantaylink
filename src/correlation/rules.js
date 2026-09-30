@@ -284,6 +284,7 @@ export function findContractorPortfolios(snapshot, observationIndex = createObse
       .map(entry => entry.project)
       .sort((a, b) => a.canonicalKey.localeCompare(b.canonicalKey));
 
+    const contractorBasis = uniqueEntries[0].contractor.basis;
     findings.push(baseFinding({
       ruleId: "contractor-project-portfolio",
       findingType: "CONTRACTOR_PORTFOLIO",
@@ -299,7 +300,7 @@ export function findContractorPortfolios(snapshot, observationIndex = createObse
       payload: {
         statement: "The same contractor identity key appears in multiple canonical project records.",
         contractorIdentityKey: contractorKey,
-        contractorIdentityBasis: uniqueEntries[0].contractor.basis,
+        contractorIdentityBasis: contractorBasis,
         contractorDisplayNames: [...new Set(
           projectRows.map(project => clean(project.data?.contractor)).filter(Boolean)
         )].sort(),
