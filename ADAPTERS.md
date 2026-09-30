@@ -51,24 +51,27 @@ The HTML response is preserved as the raw document; the normalized observation r
 
 ## DA SIDLAN
 
-Purpose: consume documented infrastructure datasets such as I-BUILD records.
+Implemented adapter: `src/adapters/da-sidlan.js`.
 
-Target fields include project ID, location, coordinates, funding, estimated/awarded cost, physical progress, stage, and status.
+The adapter targets the documented SIDLAN I-BUILD dataset endpoint. It supports filters for:
+- `SIDLAN_DATASET_ID` (default `ib-01-001`)
+- `SIDLAN_CLUSTER` (default `all`)
+- `SIDLAN_REGION` (default `all`)
+- `SIDLAN_PROVINCE` (default `all`)
+- `SIDLAN_GROUP_STATUS` (default `all`)
 
-Base: https://sidlan.da.gov.ph/api/index
-
-An API key must be supplied server-side; never ship it in the static client.
+It requires `SIDLAN_API_KEY` server-side. The first cut uses JSON output because it is directly machine-readable; it does not attempt to obtain, expose, or bypass API keys.
 
 ## COA eLibrary
 
-Purpose: index audit reports and official issuances.
+Implemented adapter: `src/adapters/coa-elibrary.js`.
 
-Base: https://elibrary.coa.gov.ph/
+It ingests explicitly configured eLibrary resource/search URLs from `COA_ELIBRARY_URLS`. The HTML is retained as raw evidence and normalized into official-document source entities with document metadata. It intentionally does not crawl the eLibrary or infer audit findings from titles/categories.
 
 ## PhilGEPS
 
-Purpose: normalize procurement events when suitable open/API access is available.
+Implemented adapter: `src/adapters/philgeps.js`.
 
-Base: https://ps-philgeps.gov.ph/
+It ingests explicitly configured machine-readable Open Data URLs through `PHILGEPS_OPEN_DATA_URLS`. JSON and CSV are supported. Each row becomes a source-backed `procurement_event` with common fields such as reference number, procuring entity, procurement mode, ABC, award amount, awardee, dates, and source-row payload.
 
-Do not scrape authenticated endpoints without an appropriate access path.
+It does not scrape authenticated endpoints and does not infer contractor/political relationships from a procurement row.
