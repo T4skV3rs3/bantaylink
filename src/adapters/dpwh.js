@@ -141,9 +141,14 @@ export const dpwhTransparencyAdapter = {
         const project = extractProject(item);
         yield {
           payload: project,
-          url,
+          url: redactUrl(url),
+          retrievalUrl: response.url,
+          requestMethod: "GET",
+          responseHeaders: headersToObject(response.headers),
           httpStatus: response.status,
           mimeType: "application/json",
+          payloadEncoding: "utf-8",
+          hashScope: "canonical_payload",
           contentHash: sha256(project)
         };
         yielded += 1;
@@ -199,9 +204,14 @@ export const dpwhProjectDetailAdapter = {
       const project = extractProject(payload);
       yield {
         payload: project,
-        url,
+        url: redactUrl(url),
+        retrievalUrl: response.url,
+        requestMethod: "GET",
+        responseHeaders: headersToObject(response.headers),
         httpStatus: response.status,
         mimeType: "application/json",
+        payloadEncoding: "utf-8",
+        hashScope: "canonical_payload",
         contentHash: sha256(project)
       };
     }
