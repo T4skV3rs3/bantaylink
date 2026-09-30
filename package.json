@@ -12,10 +12,9 @@
     "ingest:source": "node scripts/ingest-source.mjs",
     "correlate": "node scripts/run-correlation.mjs",
     "db:init": "node scripts/init-db.mjs",
-    "test:resolution": "node scripts/test-resolution.mjs",
-    "resolve": "node scripts/run-resolution.mjs",
     "resolve:entities": "node scripts/run-entity-resolution.mjs",
-    "test:entity-resolution": "node scripts/test-entity-resolution.mjs"
+    "test:entity-resolution": "node scripts/test-entity-resolution.mjs",
+    "resolve": "node scripts/run-entity-resolution.mjs"
   },
   "dependencies": {
     "pg": "^8.16.3"
