@@ -169,11 +169,29 @@ export default async function handler(req, res) {
         )
       : { rows: [] };
 
-    const [entities, observations, edges] = await Promise.all([
+    let [entities, observations, edges] = await Promise.all([
       entityQuery,
       observationQuery,
       edgeQuery
     ]);
+
+    if (observationIdList.length || edgeIdList.length) {
+      const derivedEntityIds = [
+        ...observations.rows.map(row => row.entityId),
+        ...edges.rows.flatMap(row => [row.fromEntityId, row.toEntityId])
+      ].filter(Boolean);
+
+      const missing = derivedEntityIds.filter(id => !targetEntityIds.includes(id));
+      if (missing.length) {
+        targetEntityIds = [...new Set([...targetEntityIds, ...missing])];
+        entities = await pool.query(
+          "SELECT id, entity_type AS \"entityType\", canonical_key AS \"canonicalKey\", label, data, " +
+          "first_seen_at AS \"firstSeenAt\", last_seen_at AS \"lastSeenAt\" " +
+          "FROM entities WHERE id=ANY($1::text[]) ORDER BY entity_type, canonical_key",
+          [targetEntityIds]
+        );
+      }
+    }
 
     const rawDocumentIds = [...new Set([
       ...observations.rows.map(row => row.rawDocumentId),
