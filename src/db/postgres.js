@@ -422,6 +422,235 @@ export function createPostgresStore(pool) {
       return result.rows[0];
     },
 
+    async getEntityResolutionSnapshot() {
+      const entities = await pool.query(
+        `SELECT id, entity_type AS "entityType", canonical_key AS "canonicalKey",
+                label, data, first_seen_at AS "firstSeenAt", last_seen_at AS "lastSeenAt"
+         FROM entities
+         WHERE entity_type IN ('project','contractor','person','organization','procurement_event','source')
+            OR (entity_type='election_result'
+                AND (data->>'dataset' = 'NLE_Winners_2004-2025'
+                     OR data->>'dataset' IS NULL))`
+      );
+
+      const entityIds = entities.rows.map(row => row.id);
+      const [observations, edges] = await Promise.all([
+        entityIds.length
+          ? pool.query(
+              `SELECT id, entity_id AS "entityId", source_id AS "sourceId",
+                      ingestion_run_id AS "ingestionRunId", raw_document_id AS "rawDocumentId",
+                      record_type AS "recordType", source_record_id AS "sourceRecordId",
+                      observed_at AS "observedAt", content_hash AS "contentHash", data
+               FROM observations
+               WHERE entity_id = ANY($1::text[])`,
+              [entityIds]
+            )
+          : { rows: [] },
+        entityIds.length
+          ? pool.query(
+              `SELECT id, from_entity_id AS "fromEntityId", to_entity_id AS "toEntityId",
+                      edge_type AS "edgeType", source_id AS "sourceId",
+                      ingestion_run_id AS "ingestionRunId", raw_document_id AS "rawDocumentId",
+                      source_record_id AS "sourceRecordId", observed_at AS "observedAt",
+                      content_hash AS "contentHash", data
+               FROM edges
+               WHERE from_entity_id = ANY($1::text[])
+                  OR to_entity_id = ANY($1::text[])`,
+              [entityIds]
+            )
+          : { rows: [] }
+      ]);
+
+      return { entities: entities.rows, observations: observations.rows, edges: edges.rows };
+    },
+
+    async startEntityResolutionRun(input) {
+      const result = await pool.query(
+        `INSERT INTO entity_resolution_runs (id, engine_version, status)
+         VALUES ($1,$2,'running')
+         RETURNING id, engine_version AS "engineVersion", status,
+                   started_at AS "startedAt", completed_at AS "completedAt",
+                   entity_count AS "entityCount", candidate_count AS "candidateCount",
+                   auto_confirmed_count AS "autoConfirmedCount",
+                   review_required_count AS "reviewRequiredCount",
+                   conflict_count AS "conflictCount", errors`,
+        [input.id, input.engineVersion]
+      );
+      return result.rows[0];
+    },
+
+    async insertEntityResolutionCandidate(runId, candidate) {
+      const id = candidate.id || `${runId}:${candidate.fingerprint}`;
+      const result = await pool.query(
+        `INSERT INTO entity_resolution_candidates
+          (id, entity_resolution_run_id, source_entity_id, candidate_entity_id,
+           entity_type, match_method, status, fingerprint, rationale,
+           evidence_observation_ids, evidence_edge_ids, payload)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)
+         ON CONFLICT (entity_resolution_run_id, fingerprint) DO UPDATE
+           SET status=EXCLUDED.status, rationale=EXCLUDED.rationale,
+               evidence_observation_ids=EXCLUDED.evidence_observation_ids,
+               evidence_edge_ids=EXCLUDED.evidence_edge_ids,
+               payload=EXCLUDED.payload
+         RETURNING id, entity_resolution_run_id AS "entityResolutionRunId",
+                   source_entity_id AS "sourceEntityId",
+                   candidate_entity_id AS "candidateEntityId",
+                   entity_type AS "entityType", match_method AS "matchMethod",
+                   status, fingerprint, rationale,
+                   evidence_observation_ids AS "evidenceObservationIds",
+                   evidence_edge_ids AS "evidenceEdgeIds", payload`,
+        [
+          id, runId, candidate.sourceEntityId, candidate.candidateEntityId,
+          candidate.entityType, candidate.matchMethod, candidate.status,
+          candidate.fingerprint, candidate.rationale,
+          candidate.evidenceObservationIds, candidate.evidenceEdgeIds,
+          JSON.stringify(candidate.payload ?? {})
+        ]
+      );
+      return result.rows[0];
+    },
+
+    async completeEntityResolutionRun(id, patch) {
+      const result = await pool.query(
+        `UPDATE entity_resolution_runs
+         SET status='completed', completed_at=NOW(),
+             entity_count=$2, candidate_count=$3,
+             auto_confirmed_count=$4, review_required_count=$5,
+             conflict_count=$6, errors=$7::jsonb
+         WHERE id=$1
+         RETURNING id, engine_version AS "engineVersion", status,
+                   started_at AS "startedAt", completed_at AS "completedAt",
+                   entity_count AS "entityCount", candidate_count AS "candidateCount",
+                   auto_confirmed_count AS "autoConfirmedCount",
+                   review_required_count AS "reviewRequiredCount",
+                   conflict_count AS "conflictCount", errors`,
+        [
+          id, patch.entityCount, patch.candidateCount,
+          patch.autoConfirmedCount, patch.reviewRequiredCount,
+          patch.conflictCount, JSON.stringify(patch.errors ?? [])
+        ]
+      );
+      return result.rows[0];
+    },
+
+    async failEntityResolutionRun(id, error) {
+      const result = await pool.query(
+        `UPDATE entity_resolution_runs
+         SET status='failed', completed_at=NOW(),
+             errors=$2::jsonb
+         WHERE id=$1
+         RETURNING id, engine_version AS "engineVersion", status,
+                   started_at AS "startedAt", completed_at AS "completedAt",
+                   entity_count AS "entityCount", candidate_count AS "candidateCount",
+                   auto_confirmed_count AS "autoConfirmedCount",
+                   review_required_count AS "reviewRequiredCount",
+                   conflict_count AS "conflictCount", errors`,
+        [id, JSON.stringify([{ stage: "run", message: String(error?.message ?? error), at: new Date().toISOString() }])]
+      );
+      return result.rows[0];
+    },
+
+    async insertEntityResolutionAssertion(assertion) {
+      const result = await pool.query(
+        `INSERT INTO entity_resolution_assertions
+          (id, source_entity_id, canonical_entity_id, assertion_type, resolution_run_id,
+           evidence_observation_ids, evidence_edge_ids, basis)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)
+         RETURNING id, source_entity_id AS "sourceEntityId",
+                   canonical_entity_id AS "canonicalEntityId",
+                   assertion_type AS "assertionType",
+                   resolution_run_id AS "resolutionRunId",
+                   evidence_observation_ids AS "evidenceObservationIds",
+                   evidence_edge_ids AS "evidenceEdgeIds",
+                   basis, created_at AS "createdAt"`,
+        [
+          assertion.id,
+          assertion.sourceEntityId,
+          assertion.canonicalEntityId,
+          assertion.assertionType,
+          assertion.resolutionRunId ?? null,
+          assertion.evidenceObservationIds ?? [],
+          assertion.evidenceEdgeIds ?? [],
+          JSON.stringify(assertion.basis ?? {})
+        ]
+      );
+      return result.rows[0];
+    },
+
+    async getEvidenceBundle({ observationIds = [], edgeIds = [] } = {}) {
+      const obs = [...new Set(observationIds)].filter(Boolean).slice(0, 500);
+      const edgeList = [...new Set(edgeIds)].filter(Boolean).slice(0, 500);
+
+      const [observations, edges] = await Promise.all([
+        obs.length ? pool.query(
+          `SELECT o.id, o.entity_id AS "entityId", o.source_id AS "sourceId",
+                  o.ingestion_run_id AS "ingestionRunId", o.raw_document_id AS "rawDocumentId",
+                  o.record_type AS "recordType", o.source_record_id AS "sourceRecordId",
+                  o.observed_at AS "observedAt", o.content_hash AS "contentHash", o.data,
+                  s.name AS "sourceName", s.source_class AS "sourceClass",
+                  s.publisher, s.canonical_url AS "canonicalUrl",
+                  r.retrieval_url AS "retrievalUrl", r.retrieved_at AS "retrievedAt",
+                  r.http_status AS "httpStatus", r.mime_type AS "mimeType",
+                  r.payload_encoding AS "payloadEncoding", r.hash_algorithm AS "hashAlgorithm",
+                  r.hash_scope AS "hashScope", r.content_hash AS "rawContentHash",
+                  r.payload
+           FROM observations o
+           JOIN sources s ON s.id=o.source_id
+           LEFT JOIN raw_documents r ON r.id=o.raw_document_id
+           WHERE o.id = ANY($1::text[])
+           ORDER BY o.observed_at DESC`,
+          [obs]
+        ) : { rows: [] },
+        edgeList.length ? pool.query(
+          `SELECT e.id, e.from_entity_id AS "fromEntityId", e.to_entity_id AS "toEntityId",
+                  e.edge_type AS "edgeType", e.source_id AS "sourceId",
+                  e.ingestion_run_id AS "ingestionRunId", e.raw_document_id AS "rawDocumentId",
+                  e.source_record_id AS "sourceRecordId", e.observed_at AS "observedAt",
+                  e.content_hash AS "contentHash", e.data,
+                  s.name AS "sourceName", s.source_class AS "sourceClass",
+                  s.publisher, s.canonical_url AS "canonicalUrl",
+                  r.retrieval_url AS "retrievalUrl", r.retrieved_at AS "retrievedAt",
+                  r.http_status AS "httpStatus", r.mime_type AS "mimeType",
+                  r.payload_encoding AS "payloadEncoding", r.hash_algorithm AS "hashAlgorithm",
+                  r.hash_scope AS "hashScope", r.content_hash AS "rawContentHash"
+           FROM edges e
+           JOIN sources s ON s.id=e.source_id
+           LEFT JOIN raw_documents r ON r.id=e.raw_document_id
+           WHERE e.id = ANY($1::text[])
+           ORDER BY e.observed_at DESC`,
+          [edgeList]
+        ) : { rows: [] }
+      ]);
+
+      const ids = observations.rows.map(row => row.id);
+      const eids = edges.rows.map(row => row.id);
+      const [observationOccurrences, edgeOccurrences] = await Promise.all([
+        ids.length ? pool.query(
+          `SELECT observation_id AS "observationId", ingestion_run_id AS "ingestionRunId",
+                  raw_document_id AS "rawDocumentId", seen_at AS "seenAt"
+           FROM observation_occurrences
+           WHERE observation_id = ANY($1::text[])
+           ORDER BY seen_at DESC`,
+          [ids]
+        ) : { rows: [] },
+        eids.length ? pool.query(
+          `SELECT edge_id AS "edgeId", ingestion_run_id AS "ingestionRunId",
+                  raw_document_id AS "rawDocumentId", seen_at AS "seenAt"
+           FROM edge_occurrences
+           WHERE edge_id = ANY($1::text[])
+           ORDER BY seen_at DESC`,
+          [eids]
+        ) : { rows: [] }
+      ]);
+
+      return {
+        observations: observations.rows,
+        edges: edges.rows,
+        observationOccurrences: observationOccurrences.rows,
+        edgeOccurrences: edgeOccurrences.rows
+      };
+    },
+
     async getCorrelationSnapshot() {
       const entities = await pool.query(
         `SELECT id, entity_type AS "entityType", canonical_key AS "canonicalKey",
