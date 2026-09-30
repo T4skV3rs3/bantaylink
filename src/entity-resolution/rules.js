@@ -196,6 +196,19 @@ function observationIndex(snapshot) {
   return index;
 }
 
+function edgeIndex(snapshot) {
+  const index = new Map();
+  for (const row of snapshot.edges) {
+    for (const entityId of [row.fromEntityId, row.toEntityId]) {
+      if (!entityId) continue;
+      const list = index.get(entityId) ?? [];
+      list.push(row);
+      index.set(entityId, list);
+    }
+  }
+  return index;
+}
+
 function evidenceIds(index, entityId) {
   return (index.get(entityId) ?? [])
     .map(item => item.id)
@@ -203,8 +216,8 @@ function evidenceIds(index, entityId) {
     .slice(0, MAX_EVIDENCE_IDS_PER_ENTITY);
 }
 
-function pairEvidence(index, a, b) {
-  return [...new Set([...evidenceIds(index, a.id), ...evidenceIds(index, b.id)])].sort();
+function pairEvidence(index, entityId, otherId) {
+  return [...new Set([...evidenceIds(index, entityId), ...evidenceIds(index, otherId)])].sort();
 }
 
 function candidateFingerprint(method, a, b) {
@@ -365,6 +378,7 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
     .sort((a, b) => a.canonicalKey.localeCompare(b.canonicalKey));
 
   const obsIndex = observationIndex(snapshot);
+  const edgeIdx = edgeIndex(snapshot);
   const stable = buildStableIndex(entities);
   const personNames = buildPersonNameIndex(entities);
   const contractorNames = buildContractorNameIndex(entities);
@@ -395,7 +409,8 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
           matchMethod: external.namespace,
           status: "AUTO_CONFIRMED",
           rationale: "The source records expose the same typed stable external identifier. The identifier match is automatic; any name or descriptive-field differences remain visible for review.",
-          evidenceObservationIds: pairEvidence(obsIndex, sourceEntity, targetEntity),
+          evidenceObservationIds: pairEvidence(obsIndex, sourceEntity.id, targetEntity.id),
+          evidenceEdgeIds: pairEvidence(edgeIdx, sourceEntity.id, targetEntity.id),
           payload: {
             identityScope: external.identityScope,
             identifierNamespace: external.namespace,
@@ -430,7 +445,8 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
               matchMethod: "normalized_contractor_name",
               status: "REVIEW_REQUIRED",
               rationale: "The contractor names normalize to the same value, but no shared stable identifier was provided. This is a review candidate only.",
-              evidenceObservationIds: pairEvidence(obsIndex, pair[0], pair[1]),
+              evidenceObservationIds: pairEvidence(obsIndex, pair[0].id, pair[1].id),
+              evidenceEdgeIds: pairEvidence(edgeIdx, pair[0].id, pair[1].id),
               payload: { normalizedName: sourceName }
             }));
           } else if (aPcab && bPcab && aPcab !== bPcab) {
@@ -441,7 +457,8 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
               matchMethod: "contractor_name_conflicting_pcab",
               status: "CONFLICT",
               rationale: "The records share a normalized contractor name but expose different PCAB identifiers. They must not be merged automatically.",
-              evidenceObservationIds: pairEvidence(obsIndex, pair[0], pair[1]),
+              evidenceObservationIds: pairEvidence(obsIndex, pair[0].id, pair[1].id),
+          evidenceEdgeIds: pairEvidence(edgeIdx, pair[0].id, pair[1].id),
               payload: {
                 normalizedName: sourceName,
                 sourcePcabId: aPcab,
