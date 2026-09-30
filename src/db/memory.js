@@ -157,12 +157,14 @@ export class MemoryStore {
       startedAt: new Date().toISOString(),
       completedAt: null,
       entityCount: 0,
+      identityRecordCount: 0,
       candidateCount: 0,
       autoConfirmedCount: 0,
       reviewRequiredCount: 0,
       conflictCount: 0,
       clusterCount: 0,
       truncated: false,
+      comparisonCount: 0,
       errors: []
     };
     if (!this.entityResolutionRuns) this.entityResolutionRuns = new Map();
