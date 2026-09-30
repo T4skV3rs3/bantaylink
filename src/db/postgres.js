@@ -618,7 +618,8 @@ export function createPostgresStore(pool) {
         observations: observations.rows,
         edges: edgeResult.rows
       };
-    }
+    },
+
     async startCorrelationRun(input) {
       const result = await pool.query(
         `INSERT INTO correlation_runs (id, engine_version, status)
