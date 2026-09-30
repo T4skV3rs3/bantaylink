@@ -626,7 +626,7 @@ export function createPostgresStore(pool) {
          RETURNING id, engine_version AS "engineVersion", status,
                    started_at AS "startedAt", completed_at AS "completedAt",
                    entity_count AS "entityCount", observation_count AS "observationCount",
-                   edge_count AS "edgeCount", finding_count AS "findingCount", errors`,
+                   edge_count AS "edgeCount", finding_count AS "findingCount", truncated, errors`,
         [input.id, input.engineVersion]
       );
       return result.rows[0];
@@ -678,7 +678,8 @@ export function createPostgresStore(pool) {
              observation_count=$3,
              edge_count=$4,
              finding_count=$5,
-             errors=$6::jsonb
+             truncated=$6,
+             errors=$7::jsonb
          WHERE id=$1
          RETURNING id, engine_version AS "engineVersion", status,
                    started_at AS "startedAt", completed_at AS "completedAt",
@@ -690,6 +691,7 @@ export function createPostgresStore(pool) {
           patch.observationCount,
           patch.edgeCount,
           patch.findingCount,
+          Boolean(patch.truncated),
           JSON.stringify(patch.errors ?? [])
         ]
       );
