@@ -270,6 +270,7 @@ CREATE TABLE IF NOT EXISTS entity_resolution_candidates (
   source_entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
   candidate_entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
   entity_type TEXT NOT NULL,
+  identity_group_key TEXT,
   match_method TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('AUTO_CONFIRMED','REVIEW_REQUIRED','CONFLICT','REJECTED')),
   fingerprint TEXT NOT NULL,
@@ -290,15 +291,22 @@ CREATE INDEX IF NOT EXISTS idx_entity_resolution_candidates_source
 CREATE INDEX IF NOT EXISTS idx_entity_resolution_candidates_candidate
   ON entity_resolution_candidates(candidate_entity_id);
 
+ALTER TABLE entity_resolution_candidates
+  ADD COLUMN IF NOT EXISTS identity_group_key TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_entity_resolution_candidates_status
   ON entity_resolution_candidates(status);
+
+CREATE INDEX IF NOT EXISTS idx_entity_resolution_candidates_group
+  ON entity_resolution_candidates(identity_group_key);
 
 CREATE TABLE IF NOT EXISTS entity_resolution_assertions (
   id TEXT PRIMARY KEY,
   source_entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
   canonical_entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
   assertion_type TEXT NOT NULL CHECK (assertion_type IN ('AUTO_CONFIRMED','HUMAN_CONFIRMED','HUMAN_REJECTED')),
-  resolution_run_id TEXT REFERENCES entity_resolution_runs(id),
+  resolution_run_id TEXT REFERENCES entity_resolution_runs(id) ON DELETE SET NULL,
+  identity_group_key TEXT,
   evidence_observation_ids TEXT[] NOT NULL DEFAULT '{}'::text[],
   evidence_edge_ids TEXT[] NOT NULL DEFAULT '{}'::text[],
   basis JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -311,8 +319,14 @@ CREATE INDEX IF NOT EXISTS idx_entity_resolution_assertions_source
 CREATE INDEX IF NOT EXISTS idx_entity_resolution_assertions_canonical
   ON entity_resolution_assertions(canonical_entity_id);
 
+ALTER TABLE entity_resolution_assertions
+  ADD COLUMN IF NOT EXISTS identity_group_key TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_entity_resolution_assertions_type
   ON entity_resolution_assertions(assertion_type);
+
+CREATE INDEX IF NOT EXISTS idx_entity_resolution_assertions_group
+  ON entity_resolution_assertions(identity_group_key);
 
 CREATE TABLE IF NOT EXISTS entity_resolution_clusters (
   id TEXT PRIMARY KEY,
