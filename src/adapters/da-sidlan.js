@@ -1,5 +1,6 @@
-import { fetchResponse, headersToObject, redactUrl } from "../ingestion/http.js";
+import { fetchResponse, responseBodyToNodeStream, headersToObject, redactUrl } from "../ingestion/http.js";
 import { sha256 } from "../ingestion/hash.js";
+import { parseCsvStream } from "../ingestion/csv.js";
 
 const API_BASE = "https://sidlan.da.gov.ph/api/ibuild";
 
@@ -128,25 +129,46 @@ export const daSidlanAdapter = {
       }
     });
 
+    const limit = maxRecords == null ? null : Math.max(Math.floor(Number(maxRecords)), 0);
+    let yielded = 0;
+    const retrievalUrl = response.url;
+    const responseHeaders = headersToObject(response.headers);
+    const contentType = response.headers.get("content-type") || "";
+
     if (returnValues === "csv") {
-      throw new Error("SIDLAN csv output is documented but not enabled in the first ingestion cut; use SIDLAN_RETURN_VALUES=json.");
+      const stream = responseBodyToNodeStream(response);
+      for await (const item of parseCsvStream(stream)) {
+        if (limit != null && yielded >= limit) return;
+        yield {
+          payload: item,
+          url: redactUrl(url.toString()),
+          retrievalUrl,
+          requestMethod: "GET",
+          responseHeaders,
+          httpStatus: response.status,
+          mimeType: contentType || "text/csv",
+          payloadEncoding: "utf-8",
+          hashScope: "canonical_payload",
+          contentHash: sha256(item)
+        };
+        yielded += 1;
+      }
+      return;
     }
 
     const payload = await response.json();
     const items = listItems(payload);
-    const limit = maxRecords == null ? null : Math.max(Math.floor(Number(maxRecords)), 0);
-    let yielded = 0;
 
     for (const item of items) {
       if (limit != null && yielded >= limit) return;
       yield {
         payload: item,
         url: redactUrl(url.toString()),
-        retrievalUrl: response.url,
+        retrievalUrl,
         requestMethod: "GET",
-        responseHeaders: headersToObject(response.headers),
+        responseHeaders,
         httpStatus: response.status,
-        mimeType: response.headers.get("content-type") || "application/json",
+        mimeType: contentType || "application/json",
         payloadEncoding: "utf-8",
         hashScope: "canonical_payload",
         contentHash: sha256(item)
