@@ -299,6 +299,18 @@ CREATE INDEX IF NOT EXISTS idx_entity_resolution_candidates_candidate
 CREATE INDEX IF NOT EXISTS idx_entity_resolution_candidates_status
   ON entity_resolution_candidates(status);
 
+ALTER TABLE entity_resolution_candidates
+  DROP CONSTRAINT IF EXISTS entity_resolution_candidates_source_entity_id_fkey,
+  DROP CONSTRAINT IF EXISTS entity_resolution_candidates_candidate_entity_id_fkey;
+
+ALTER TABLE entity_resolution_candidates
+  ADD CONSTRAINT entity_resolution_candidates_source_entity_id_fkey
+    FOREIGN KEY (source_entity_id) REFERENCES entities(id) ON DELETE RESTRICT,
+  ADD CONSTRAINT entity_resolution_candidates_candidate_entity_id_fkey
+    FOREIGN KEY (candidate_entity_id) REFERENCES entities(id) ON DELETE RESTRICT;
+
+
+
 CREATE TABLE IF NOT EXISTS entity_resolution_assertions (
   id TEXT PRIMARY KEY,
   source_entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
@@ -319,6 +331,18 @@ CREATE INDEX IF NOT EXISTS idx_entity_resolution_assertions_canonical
 
 CREATE INDEX IF NOT EXISTS idx_entity_resolution_assertions_type
   ON entity_resolution_assertions(assertion_type);
+
+ALTER TABLE entity_resolution_assertions
+  DROP CONSTRAINT IF EXISTS entity_resolution_assertions_source_entity_id_fkey,
+  DROP CONSTRAINT IF EXISTS entity_resolution_assertions_canonical_entity_id_fkey;
+
+ALTER TABLE entity_resolution_assertions
+  ADD CONSTRAINT entity_resolution_assertions_source_entity_id_fkey
+    FOREIGN KEY (source_entity_id) REFERENCES entities(id) ON DELETE RESTRICT,
+  ADD CONSTRAINT entity_resolution_assertions_canonical_entity_id_fkey
+    FOREIGN KEY (canonical_entity_id) REFERENCES entities(id) ON DELETE RESTRICT;
+
+
 
 CREATE TABLE IF NOT EXISTS entity_resolution_clusters (
   id TEXT PRIMARY KEY,
