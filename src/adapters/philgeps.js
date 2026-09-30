@@ -64,6 +64,7 @@ function normalizeProcurementRecord(record, contentHash, datasetUrl) {
     abc: numberOrNull(pick(record, ["Approved Budget for the Contract", "ABC", "Approved Budget"])),
     awardAmount: numberOrNull(pick(record, ["Award Amount", "Contract Amount", "Winning Bid", "Awarded Amount"])),
     awardee: stringOrNull(pick(record, ["Awardee", "Supplier", "Merchant", "Winning Bidder", "Supplier Name"])),
+    pcabId: stringOrNull(pick(record, ["PCAB License No.", "PCAB ID", "PCAB No.", "PCAB License"])),
     postingDate: stringOrNull(pick(record, ["Posting Date", "Date Posted", "Published Date"])),
     awardDate: stringOrNull(pick(record, ["Award Date", "Date Awarded"])),
     status: stringOrNull(pick(record, ["Status", "Notice Status"])),
@@ -85,7 +86,90 @@ function normalizeProcurementRecord(record, contentHash, datasetUrl) {
 }
 
 export function normalizePhilgepsRecord(record, contentHash, datasetUrl = null) {
-  return { entities: [normalizeProcurementRecord(record, contentHash, datasetUrl)] };
+  const procurement = normalizeProcurementRecord(record, contentHash, datasetUrl);
+  const event = procurement.entity;
+  const data = event.data;
+  const entities = [event];
+  const edges = [];
+
+  if (data.awardee) {
+    const normalizedName = data.awardee.toUpperCase().replace(/[^A-Z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+    const contractorKey = data.pcabId
+      ? "contractor:pcab:" + data.pcabId
+      : "contractor:philgeps-name:" + normalizedName;
+
+    entities.push({
+      entityType: "contractor",
+      canonicalKey: contractorKey,
+      label: data.awardee,
+      data: {
+        legalName: data.awardee,
+        pcabId: data.pcabId,
+        identityBasis: data.pcabId ? "pcab_id" : "normalized_name",
+        sourceKey: "philgeps-open-data"
+      }
+    });
+
+    edges.push({
+      from: {
+        entityType: "procurement_event",
+        canonicalKey: event.canonicalKey,
+        label: event.label
+      },
+      to: {
+        entityType: "contractor",
+        canonicalKey: contractorKey,
+        label: data.awardee,
+        data: {
+          legalName: data.awardee,
+          pcabId: data.pcabId,
+          identityBasis: data.pcabId ? "pcab_id" : "normalized_name"
+        }
+      },
+      edgeType: "awarded_to",
+      sourceRecordId: (data.referenceNumber || event.canonicalKey) + "::awardee",
+      contentHash
+    });
+  }
+
+  if (data.procuringEntity) {
+    const normalizedName = data.procuringEntity.toUpperCase().replace(/[^A-Z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+    const organizationKey = "organization:philgeps-name:" + normalizedName;
+
+    entities.push({
+      entityType: "organization",
+      canonicalKey: organizationKey,
+      label: data.procuringEntity,
+      data: {
+        legalName: data.procuringEntity,
+        identityBasis: "normalized_name",
+        sourceKey: "philgeps-open-data"
+      }
+    });
+
+    edges.push({
+      from: {
+        entityType: "procurement_event",
+        canonicalKey: event.canonicalKey,
+        label: event.label
+      },
+      to: {
+        entityType: "organization",
+        canonicalKey: organizationKey,
+        label: data.procuringEntity,
+        data: {
+          legalName: data.procuringEntity,
+          identityBasis: "normalized_name",
+          sourceKey: "philgeps-open-data"
+        }
+      },
+      edgeType: "procured_by",
+      sourceRecordId: (data.referenceNumber || event.canonicalKey) + "::procuring-entity",
+      contentHash
+    });
+  }
+
+  return { entities, edges };
 }
 
 function rowsFromPayload(payload, url) {
