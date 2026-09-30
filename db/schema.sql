@@ -259,6 +259,7 @@ CREATE TABLE IF NOT EXISTS entity_resolution_runs (
   review_required_count INTEGER NOT NULL DEFAULT 0,
   conflict_count INTEGER NOT NULL DEFAULT 0,
   cluster_count INTEGER NOT NULL DEFAULT 0,
+  truncated BOOLEAN NOT NULL DEFAULT FALSE,
   errors JSONB NOT NULL DEFAULT '[]'::jsonb
 );
 
@@ -268,6 +269,9 @@ CREATE INDEX IF NOT EXISTS idx_entity_resolution_runs_status
 
 ALTER TABLE entity_resolution_runs
   ADD COLUMN IF NOT EXISTS cluster_count INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE entity_resolution_runs
+  ADD COLUMN IF NOT EXISTS truncated BOOLEAN NOT NULL DEFAULT FALSE;
 
 
 CREATE TABLE IF NOT EXISTS entity_resolution_candidates (
