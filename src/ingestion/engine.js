@@ -30,6 +30,24 @@ function pushRunError(run, error, options) {
   if (run.errors.length < maxErrors) run.errors.push(error);
 }
 
+function safeSourceSnapshot(sourceConfig) {
+  const blocked = /^(api[_-]?key|token|secret|password|authorization|cookie|session)$/i;
+
+  function visit(value) {
+    if (Array.isArray(value)) return value.map(visit);
+    if (!value || typeof value !== "object") return value;
+
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        blocked.test(key) ? "[REDACTED]" : visit(item)
+      ])
+    );
+  }
+
+  return visit(sourceConfig);
+}
+
 function assertNormalizedResult(normalized) {
   if (!normalized || typeof normalized !== "object") {
     throw new Error("Adapter normalize() must return an object.");
@@ -53,6 +71,18 @@ function assertEdgeInput(edge) {
   requireField(edge?.edgeType, "normalized edgeType");
   assertEntityInput(edge.from);
   assertEntityInput(edge.to);
+}
+
+async function linkOccurrence(store, kind, occurrence) {
+  const method = kind === "observation"
+    ? store.linkObservationOccurrence
+    : store.linkEdgeOccurrence;
+
+  requireField(method, kind === "observation"
+    ? "store.linkObservationOccurrence"
+    : "store.linkEdgeOccurrence");
+
+  await method(occurrence);
 }
 
 export async function ingestAdapter({ adapter, store, options = {} }) {
@@ -92,7 +122,8 @@ export async function ingestAdapter({ adapter, store, options = {} }) {
     id: randomUUID(),
     adapterId: adapter.id,
     sourceId: source.id,
-    sourceVersion: sourceConfig.version ?? null
+    sourceVersion: sourceConfig.version ?? null,
+    sourceSnapshot: safeSourceSnapshot(sourceConfig)
   });
 
   try {
@@ -115,18 +146,30 @@ export async function ingestAdapter({ adapter, store, options = {} }) {
       try {
         if (raw == null) throw new Error("Adapter yielded an empty raw record.");
 
-        const rawPayload = raw?.payload ?? raw;
-        const contentHash = raw?.contentHash ?? sha256(rawPayload);
+        const rawPayload = raw?.payload ?? raw?.rawContent ?? raw;
+        const contentHash = raw?.contentHash ?? (
+          raw?.rawContent != null ? sha256(raw.rawContent) : sha256(rawPayload)
+        );
+        const hashScope = raw?.hashScope ?? (
+          raw?.rawContent != null ? "raw_content" : "canonical_payload"
+        );
+
         const rawDocument = await store.insertRawDocument({
           id: raw?.rawDocumentId ?? randomUUID(),
           ingestionRunId: run.id,
           sourceId: source.id,
-          canonicalUrl: raw?.url ?? sourceConfig.canonicalUrl,
+          canonicalUrl: sourceConfig.canonicalUrl,
+          retrievalUrl: raw?.retrievalUrl ?? raw?.url ?? sourceConfig.canonicalUrl,
+          requestMethod: raw?.requestMethod ?? "GET",
+          responseHeaders: raw?.responseHeaders ?? {},
           retrievedAt: raw?.retrievedAt ?? new Date().toISOString(),
           httpStatus: raw?.httpStatus ?? null,
           mimeType: raw?.mimeType ?? "application/json",
+          payloadEncoding: raw?.payloadEncoding ?? "jsonb",
+          hashAlgorithm: "sha256",
+          hashScope,
           contentHash,
-          payload: rawPayload
+          payload: raw?.payload ?? raw?.rawContent ?? raw
         });
 
         const normalized = await adapter.normalize(rawPayload, {
@@ -167,6 +210,13 @@ export async function ingestAdapter({ adapter, store, options = {} }) {
             };
             const inserted = await store.insertObservation(value);
             if (!inserted.inserted) run.recordsSkipped += 1;
+
+            await linkOccurrence(store, "observation", {
+              observationId: inserted.observation.id,
+              ingestionRunId: run.id,
+              rawDocumentId: rawDocument.id,
+              seenAt: rawDocument.retrievedAt
+            });
           }
         }
 
@@ -203,13 +253,20 @@ export async function ingestAdapter({ adapter, store, options = {} }) {
           };
           const inserted = await store.insertEdge(value);
           if (!inserted.inserted) run.recordsSkipped += 1;
+
+          await linkOccurrence(store, "edge", {
+            edgeId: inserted.edge.id,
+            ingestionRunId: run.id,
+            rawDocumentId: rawDocument.id,
+            seenAt: rawDocument.retrievedAt
+          });
         }
       } catch (error) {
         const sourceRecordId = raw?.sourceRecordId ?? raw?.recordId ?? null;
         const normalizedError = normalizeError(error, {
           stage: "record",
           sourceRecordId,
-          url: raw?.url ?? sourceConfig.canonicalUrl
+          url: raw?.retrievalUrl ?? raw?.url ?? sourceConfig.canonicalUrl
         });
         pushRunError(run, normalizedError, options);
         if (strict) throw error;
@@ -228,7 +285,7 @@ export async function ingestAdapter({ adapter, store, options = {} }) {
       stage: "run",
       url: sourceConfig.canonicalUrl
     }), options);
-    await store.failRun(run.id, error);
+    await store.failRun(run.id, error, run.errors);
     throw error;
   }
 }
