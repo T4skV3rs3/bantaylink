@@ -25,6 +25,7 @@ const project = entity("project-1", "project", "dpwh-contract:TEST001", {
   contractId: "TEST001",
   description: "Test Road",
   contractor: "Example Builders, Inc. (34698)",
+  pcabId: "34698",
   infraYear: "2025",
   startDate: "2025-01-10",
   location: {
@@ -41,6 +42,7 @@ const project2 = entity("project-2", "project", "dpwh-contract:TEST002", {
   contractId: "TEST002",
   description: "Test Bridge",
   contractor: "Example Builders, Inc. (34698)",
+  pcabId: "34698",
   infraYear: "2025",
   location: {
     city: "Other City",
@@ -123,6 +125,9 @@ const types = new Set(first.findings.map(finding => finding.findingType));
 assert(types.has("STATUS_HISTORY"));
 assert(types.has("MULTI_SOURCE_PROJECT"));
 assert(types.has("CONTRACTOR_PORTFOLIO"));
+const contractorPortfolio = first.findings.find(finding => finding.findingType === "CONTRACTOR_PORTFOLIO");
+assert.equal(contractorPortfolio.status, "VERIFIED_FACT");
+assert.equal(contractorPortfolio.payload.contractorIdentityBasis, "pcab_id");
 assert(types.has("ELECTION_PROJECT_OVERLAP"));
 assert(types.has("ELECTION_PROJECT_CONTRACTOR_INTERSECTION"));
 
