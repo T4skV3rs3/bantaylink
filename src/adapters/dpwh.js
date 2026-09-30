@@ -36,13 +36,36 @@ function sourceSignal(status) {
   return [];
 }
 
+function normalizeContractorName(value) {
+  return String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[^A-Z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function winningBidder(project) {
+  const bidders = Array.isArray(project?.bidders) ? project.bidders : [];
+  return bidders.find(item =>
+    item?.isWinner === true ||
+    String(item?.isWinner).toLowerCase() === "true"
+  ) ?? null;
+}
+
 export function normalizeDpwhProject(record, contentHash) {
   const project = extractProject(record);
   const contractId = stringOrNull(project.contractId);
   if (!contractId) throw new Error("DPWH project record is missing contractId.");
 
+  const winnerBidder = winningBidder(project);
+  const pcabId = stringOrNull(project.pcabId ?? winnerBidder?.pcabId);
+  const contractor = stringOrNull(project.contractor);
+
   const data = {
     contractId,
+    pcabId,
     description: stringOrNull(project.description),
     category: stringOrNull(project.category),
     componentCategories: project.componentCategories ?? null,
@@ -81,20 +104,63 @@ export function normalizeDpwhProject(record, contentHash) {
     signals: sourceSignal(project.status)
   };
 
-  return {
-    entities: [{
-      entityType: "project",
-      canonicalKey: `dpwh-contract:${contractId}`,
-      label: project.description ? `${contractId} — ${project.description}` : contractId,
-      data,
-      observations: [{
-        recordType: "project",
-        sourceRecordId: contractId,
-        contentHash,
-        data
-      }]
+  const entities = [{
+    entityType: "project",
+    canonicalKey: `dpwh-contract:${contractId}`,
+    label: project.description ? `${contractId} — ${project.description}` : contractId,
+    data,
+    observations: [{
+      recordType: "project",
+      sourceRecordId: contractId,
+      contentHash,
+      data
     }]
-  };
+  }];
+
+  const edges = [];
+  if (contractor) {
+    const normalizedName = normalizeContractorName(contractor);
+    const contractorKey = pcabId
+      ? `contractor:pcab:${pcabId}`
+      : `contractor:dpwh-name:${normalizedName}`;
+
+    entities.push({
+      entityType: "contractor",
+      canonicalKey: contractorKey,
+      label: contractor,
+      data: {
+        legalName: contractor,
+        pcabId,
+        identityBasis: pcabId ? "pcab_id" : "normalized_name",
+        sourceKey: "dpwh-transparency"
+      }
+    });
+
+    edges.push({
+      from: {
+        entityType: "project",
+        canonicalKey: `dpwh-contract:${contractId}`,
+        label: project.description ? `${contractId} — ${project.description}` : contractId
+      },
+      to: {
+        entityType: "contractor",
+        canonicalKey: contractorKey,
+        label: contractor,
+        data: {
+          legalName: contractor,
+          pcabId,
+          identityBasis: pcabId ? "pcab_id" : "normalized_name",
+          sourceKey: "dpwh-transparency"
+        }
+      },
+      edgeType: "contracted_to",
+      sourceRecordId: `${contractId}::contractor`,
+      observedAt: project.contractEffectivityDate || project.startDate || undefined,
+      contentHash
+    });
+  }
+
+  return { entities, edges };
 }
 
 export const dpwhTransparencyAdapter = {
