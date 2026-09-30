@@ -56,13 +56,16 @@ This makes repeated pulls idempotent at the observation/edge level while keeping
 Correlation is a derived layer over canonical entities, observations, and source-backed edges. Derived findings are stored separately in \`correlation_runs\` and \`correlation_findings\`; they are not inserted into \`edges\`, because \`edges\` require direct source provenance.
 
 Version 0.6 rules:
-- \`STATUS_HISTORY\`: a project has multiple observations with differing published status and/or progress.
-- \`MULTI_SOURCE_PROJECT\`: a canonical project has observations from multiple source records. Source independence is not asserted by this rule.
-- \`CONTRACTOR_PORTFOLIO\`: the same contractor identity key appears across multiple projects.
-- \`ELECTION_PROJECT_OVERLAP\`: an election record and project share the applicable municipal/provincial jurisdiction and recorded year.
-- \`ELECTION_PROJECT_CONTRACTOR_INTERSECTION\`: the preceding intersection plus a named contractor.
+- `STATUS_HISTORY`: a project has multiple observations with differing published status and/or progress.
+- `MULTI_SOURCE_PROJECT`: a canonical project has observations from multiple source records. Source independence is not asserted by this rule.
+- `SOURCE_STATUS_DIVERGENCE`: the latest contributing observations publish differing project status and/or progress values.
+- `PROJECT_PROCUREMENT_LINK`: a project contract ID exactly matches an eligible PhilGEPS procurement reference number.
+- `PROJECT_PROCUREMENT_CONTRACTOR_CONFLICT`: an exact project/procurement identifier link has differing non-empty PCAB identifiers.
+- `CONTRACTOR_PORTFOLIO`: the same contractor identity key appears across multiple projects.
+- `ELECTION_PROJECT_OVERLAP`: an election record and project share the applicable municipal/provincial jurisdiction and recorded year.
+- `ELECTION_PROJECT_CONTRACTOR_INTERSECTION`: the preceding intersection plus a named contractor.
 
-The last two are \`INFERENCE_LEAD\` findings. They do not establish a role in a project, favoritism, influence, conflict of interest, wrongdoing, or causation.
+The election/project overlap findings are `INFERENCE_LEAD`; the source-divergence and exact project/procurement findings are record-level verified facts with explicit interpretation limits. No finding establishes a role in a project, favoritism, influence, conflict of interest, wrongdoing, or causation.
 
 Finding fingerprints are deterministic from rule/version/entity keys rather than volatile database row IDs, so repeated runs can be compared. Correlation runs record whether a finding limit truncated the result set. Database finding IDs are run-scoped.
 
