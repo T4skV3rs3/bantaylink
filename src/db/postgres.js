@@ -194,39 +194,24 @@ export function createPostgresStore(pool) {
         inserted: result.rowCount === 1,
         edge: result.rows[0] ?? edge
       };
-    }
-  };
-}
-
-export async function withTransaction(pool, work) {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const result = await work(client);
-    await client.query("COMMIT");
-    return result;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
+    },
 
     async getCorrelationSnapshot() {
       const [entities, observations, edges] = await Promise.all([
-        pool.query(\`SELECT id, entity_type AS "entityType", canonical_key AS "canonicalKey",
+        pool.query(`SELECT id, entity_type AS "entityType", canonical_key AS "canonicalKey",
                            label, data, first_seen_at AS "firstSeenAt", last_seen_at AS "lastSeenAt"
-                    FROM entities\`),
-        pool.query(\`SELECT id, entity_id AS "entityId", source_id AS "sourceId",
+                    FROM entities`),
+        pool.query(`SELECT id, entity_id AS "entityId", source_id AS "sourceId",
                            ingestion_run_id AS "ingestionRunId", raw_document_id AS "rawDocumentId",
                            record_type AS "recordType", source_record_id AS "sourceRecordId",
                            observed_at AS "observedAt", content_hash AS "contentHash", data
-                    FROM observations\`),
-        pool.query(\`SELECT id, from_entity_id AS "fromEntityId", to_entity_id AS "toEntityId",
+                    FROM observations`),
+        pool.query(`SELECT id, from_entity_id AS "fromEntityId", to_entity_id AS "toEntityId",
                            edge_type AS "edgeType", source_id AS "sourceId",
                            ingestion_run_id AS "ingestionRunId", raw_document_id AS "rawDocumentId",
                            source_record_id AS "sourceRecordId", observed_at AS "observedAt",
                            content_hash AS "contentHash", data
-                    FROM edges\`)
+                    FROM edges`)
       ]);
 
       return {
@@ -238,20 +223,21 @@ export async function withTransaction(pool, work) {
 
     async startCorrelationRun(input) {
       const result = await pool.query(
-        \`INSERT INTO correlation_runs (id, engine_version, status)
+        `INSERT INTO correlation_runs (id, engine_version, status)
          VALUES ($1,$2,'running')
          RETURNING id, engine_version AS "engineVersion", status,
                    started_at AS "startedAt", completed_at AS "completedAt",
                    entity_count AS "entityCount", observation_count AS "observationCount",
-                   edge_count AS "edgeCount", finding_count AS "findingCount", errors\`,
+                   edge_count AS "edgeCount", finding_count AS "findingCount", errors`,
         [input.id, input.engineVersion]
       );
       return result.rows[0];
     },
 
     async insertCorrelationFinding(runId, finding) {
+      const findingId = finding.id || `${runId}:${finding.fingerprint}`;
       const result = await pool.query(
-        \`INSERT INTO correlation_findings
+        `INSERT INTO correlation_findings
           (id, correlation_run_id, rule_id, finding_type, status, fingerprint,
            subject_entity_id, related_entity_ids, evidence_observation_ids,
            evidence_edge_ids, payload)
@@ -267,9 +253,9 @@ export async function withTransaction(pool, work) {
                    subject_entity_id AS "subjectEntityId",
                    related_entity_ids AS "relatedEntityIds",
                    evidence_observation_ids AS "evidenceObservationIds",
-                   evidence_edge_ids AS "evidenceEdgeIds", payload\`,
+                   evidence_edge_ids AS "evidenceEdgeIds", payload`,
         [
-          finding.id,
+          findingId,
           runId,
           finding.ruleId,
           finding.findingType,
@@ -287,7 +273,7 @@ export async function withTransaction(pool, work) {
 
     async completeCorrelationRun(id, patch) {
       const result = await pool.query(
-        \`UPDATE correlation_runs
+        `UPDATE correlation_runs
          SET status='completed',
              completed_at=NOW(),
              entity_count=$2,
@@ -299,7 +285,7 @@ export async function withTransaction(pool, work) {
          RETURNING id, engine_version AS "engineVersion", status,
                    started_at AS "startedAt", completed_at AS "completedAt",
                    entity_count AS "entityCount", observation_count AS "observationCount",
-                   edge_count AS "edgeCount", finding_count AS "findingCount", errors\`,
+                   edge_count AS "edgeCount", finding_count AS "findingCount", errors`,
         [
           id,
           patch.entityCount,
@@ -314,7 +300,7 @@ export async function withTransaction(pool, work) {
 
     async failCorrelationRun(id, error) {
       const result = await pool.query(
-        \`UPDATE correlation_runs
+        `UPDATE correlation_runs
          SET status='failed',
              completed_at=NOW(),
              errors=errors || $2::jsonb
@@ -322,12 +308,26 @@ export async function withTransaction(pool, work) {
          RETURNING id, engine_version AS "engineVersion", status,
                    started_at AS "startedAt", completed_at AS "completedAt",
                    entity_count AS "entityCount", observation_count AS "observationCount",
-                   edge_count AS "edgeCount", finding_count AS "findingCount", errors\`,
+                   edge_count AS "edgeCount", finding_count AS "findingCount", errors`,
         [id, JSON.stringify([String(error?.message ?? error)])]
       );
       return result.rows[0];
     }
+  };
+}
 
+export async function withTransaction(pool, work) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await work(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
   }
 }
 
