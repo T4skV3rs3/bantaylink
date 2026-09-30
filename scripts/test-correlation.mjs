@@ -35,8 +35,7 @@ const project = entity("project-1", "project", "dpwh-contract:TEST001", {
     region: "Region Test"
   },
   status: "Suspended",
-  progress: 50,
-  pcabId: "34698"
+  progress: 50
 }, "TEST001 — Test Road");
 
 const project2 = entity("project-2", "project", "dpwh-contract:TEST002", {
@@ -175,11 +174,16 @@ const observations = [
   }, "hash-p1-d"),
   observation("obs-p2-a", "project-2", "dpwh", "project", "TEST002", "2025-03-01T00:00:00Z", project2.data, "hash-p2-a"),
   observation("obs-e1", "election-1", "openhalalan", "election_result", "winner-1", "2025-06-01T00:00:00Z", election.data, "hash-e1"),
-  observation("obs-v1", "vote-1", "openhalalan", "election_result", "vote-1", "2025-06-01T00:00:00Z", vote.data, "hash-v1")
+  observation("obs-v1", "vote-1", "openhalalan", "election_result", "vote-1", "2025-06-01T00:00:00Z", vote.data, "hash-v1"),
+  observation("obs-proc", "proc-1", "philgeps", "procurement_event", "TEST001", "2025-02-01T00:00:00Z", procurement.data, "hash-proc"),
+  observation("obs-proc-conflict", "proc-conflict", "philgeps", "procurement_event", "TEST001-CONFLICT", "2025-02-02T00:00:00Z", procurementConflict.data, "hash-proc-conflict"),
+  observation("obs-proc-notice", "proc-notice", "philgeps", "procurement_event", "TEST001-NOTICE", "2025-02-03T00:00:00Z", procurementNotice.data, "hash-proc-notice"),
+  observation("obs-proc-contractor", "proc-contractor", "philgeps", "contractor", "34698", "2025-02-01T00:00:00Z", procurementContractor.data, "hash-proc-contractor"),
+  observation("obs-proc-org", "proc-org", "philgeps", "organization", "TEST-LGU", "2025-02-01T00:00:00Z", procurementOrganization.data, "hash-proc-org")
 ];
 
 const snapshot = {
-  entities: [project, project2, election, vote],
+  entities: [project, project2, election, vote, procurement, procurementConflict, procurementNotice, procurementContractor, procurementOrganization],
   observations,
   edges: [
     {
