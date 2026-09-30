@@ -7,6 +7,12 @@ function assertArray(value, name) {
   if (!Array.isArray(value)) throw new Error("Correlation snapshot requires array: " + name);
 }
 
+function normalizeMaxFindings(value) {
+  if (value == null || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(Math.floor(number), 0) : null;
+}
+
 export function normalizeSnapshot(snapshot) {
   assertArray(snapshot.entities, "entities");
   assertArray(snapshot.observations, "observations");
@@ -24,9 +30,7 @@ export function runCorrelation({ snapshot, maxFindings } = {}) {
   const startedAt = new Date().toISOString();
   const findings = runCorrelationRules(normalizedSnapshot);
 
-  const limit = maxFindings == null
-    ? null
-    : Math.max(Number(maxFindings), 0);
+  const limit = normalizeMaxFindings(maxFindings);
 
   const limitedFindings = limit == null ? findings : findings.slice(0, limit);
 
