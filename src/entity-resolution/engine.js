@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   ENTITY_RESOLUTION_ENGINE_VERSION,
   resolveEntities,
+  buildIdentityRecords,
   buildAutoConfirmedClusters
 } from "./rules.js";
 
@@ -14,11 +15,8 @@ function normalizeMaxCandidates(value) {
   return Math.max(Math.floor(number), 0);
 }
 
-function candidateByFingerprint(candidates) {
-  return new Map(candidates.map(item => [item.fingerprint, item]));
-}
-
 export function runEntityResolution({ snapshot, maxCandidates } = {}) {
+  const identityRecords = buildIdentityRecords(snapshot);
   const result = resolveEntities(snapshot, {
     maxCandidates: normalizeMaxCandidates(maxCandidates) ?? 25000
   });
@@ -36,14 +34,17 @@ export function runEntityResolution({ snapshot, maxCandidates } = {}) {
       startedAt: new Date().toISOString(),
       completedAt: new Date().toISOString(),
       entityCount: snapshot.entities.length,
+      identityRecordCount: identityRecords.length,
       candidateCount: result.candidates.length,
       autoConfirmedCount: autoConfirmed,
       reviewRequiredCount: reviewRequired,
       conflictCount: conflicts,
       clusterCount: clusters.length,
       truncated: Boolean(result.truncated),
+      comparisonCount: result.comparisonCount ?? 0,
       errors: []
     },
+    identityRecords,
     candidates: result.candidates,
     clusters
   };
@@ -52,12 +53,13 @@ export function runEntityResolution({ snapshot, maxCandidates } = {}) {
 export async function executeEntityResolutionRun({ store, maxCandidates } = {}) {
   if (!store?.getEntityResolutionSnapshot ||
       !store?.startEntityResolutionRun ||
+      !store?.insertEntityResolutionIdentityRecord ||
       !store?.insertEntityResolutionCandidate ||
       !store?.insertEntityResolutionAssertion ||
+      !store?.insertEntityResolutionCluster ||
       !store?.completeEntityResolutionRun ||
-      !store?.failEntityResolutionRun ||
-      !store?.insertEntityResolutionCluster) {
-    throw new Error("Entity-resolution store is missing required run/cluster/assertion methods.");
+      !store?.failEntityResolutionRun) {
+    throw new Error("Entity-resolution store is missing required identity/candidate/cluster/assertion methods.");
   }
 
   const snapshot = await store.getEntityResolutionSnapshot();
@@ -71,11 +73,14 @@ export async function executeEntityResolutionRun({ store, maxCandidates } = {}) 
   try {
     const result = runEntityResolution({ snapshot, maxCandidates });
 
+    for (const identity of result.identityRecords) {
+      await store.insertEntityResolutionIdentityRecord(runId, identity);
+    }
+
     for (const item of result.candidates) {
       await store.insertEntityResolutionCandidate(runId, item);
     }
 
-    const candidatesByFingerprint = candidateByFingerprint(result.candidates);
     for (const cluster of result.clusters) {
       await store.insertEntityResolutionCluster(runId, cluster);
 
@@ -99,10 +104,9 @@ export async function executeEntityResolutionRun({ store, maxCandidates } = {}) 
         );
 
         const evidence = [...new Set(supportingCandidates.flatMap(item => item.evidenceObservationIds))].sort();
-        const assertionId = runId + ":assertion:" + cluster.clusterKey + ":" + memberEntityId;
 
         await store.insertEntityResolutionAssertion({
-          id: assertionId,
+          id: runId + ":assertion:" + cluster.clusterKey + ":" + memberEntityId,
           sourceEntityId: memberEntityId,
           canonicalEntityId: cluster.representativeEntityId,
           assertionType: "AUTO_CONFIRMED",
@@ -124,12 +128,14 @@ export async function executeEntityResolutionRun({ store, maxCandidates } = {}) 
 
     return await store.completeEntityResolutionRun(runId, {
       entityCount: result.run.entityCount,
+      identityRecordCount: result.run.identityRecordCount,
       candidateCount: result.run.candidateCount,
       autoConfirmedCount: result.run.autoConfirmedCount,
       reviewRequiredCount: result.run.reviewRequiredCount,
       conflictCount: result.run.conflictCount,
       clusterCount: result.clusters.length,
       truncated: result.run.truncated,
+      comparisonCount: result.run.comparisonCount,
       errors: []
     });
   } catch (error) {
