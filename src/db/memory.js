@@ -103,4 +103,53 @@ export class MemoryStore {
     this.edges.set(edge.id, edge);
     return { inserted: true, edge };
   }
+
+  async getCorrelationSnapshot() {
+    return {
+      entities: [...this.entities.values()].map(row => ({ ...row })),
+      observations: [...this.observations.values()].map(row => ({ ...row })),
+      edges: [...this.edges.values()].map(row => ({ ...row }))
+    };
+  }
+
+  async startCorrelationRun(input) {
+    const run = {
+      id: input.id,
+      engineVersion: input.engineVersion,
+      status: "running",
+      startedAt: new Date().toISOString(),
+      completedAt: null,
+      entityCount: 0,
+      observationCount: 0,
+      edgeCount: 0,
+      findingCount: 0,
+      errors: []
+    };
+    if (!this.correlationRuns) this.correlationRuns = new Map();
+    this.correlationRuns.set(run.id, run);
+    return run;
+  }
+
+  async insertCorrelationFinding(runId, finding) {
+    if (!this.correlationFindings) this.correlationFindings = new Map();
+    const id = finding.id || runId + ":" + finding.fingerprint;
+    const row = { ...finding, id, correlationRunId: runId };
+    this.correlationFindings.set(id, row);
+    return row;
+  }
+
+  async completeCorrelationRun(id, patch) {
+    const run = this.correlationRuns.get(id);
+    Object.assign(run, patch, { status: "completed", completedAt: new Date().toISOString() });
+    return run;
+  }
+
+  async failCorrelationRun(id, error) {
+    const run = this.correlationRuns.get(id);
+    run.status = "failed";
+    run.completedAt = new Date().toISOString();
+    run.errors.push(String(error?.message ?? error));
+    return run;
+  }
+
 }
