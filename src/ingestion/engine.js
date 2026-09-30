@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { sha256 } from "./hash.js";
+import { redactUrl } from "./http.js";
 
 function requireField(value, name) {
   if (!value) throw new Error(`Missing required ingestion field: ${name}`);
@@ -46,6 +47,17 @@ function safeSourceSnapshot(sourceConfig) {
   }
 
   return visit(sourceConfig);
+}
+
+function sanitizeResponseHeaders(headers) {
+  if (!headers || typeof headers !== "object") return {};
+  const sensitive = /^(authorization|cookie|set-cookie|proxy-authorization|x-api-key|x-auth-token)$/i;
+  return Object.fromEntries(
+    Object.entries(headers).map(([key, value]) => [
+      key,
+      sensitive.test(key) ? "[REDACTED]" : String(value)
+    ])
+  );
 }
 
 function assertNormalizedResult(normalized) {
@@ -159,9 +171,9 @@ export async function ingestAdapter({ adapter, store, options = {} }) {
           ingestionRunId: run.id,
           sourceId: source.id,
           canonicalUrl: sourceConfig.canonicalUrl,
-          retrievalUrl: raw?.retrievalUrl ?? raw?.url ?? sourceConfig.canonicalUrl,
+          retrievalUrl: redactUrl(raw?.retrievalUrl ?? raw?.url ?? sourceConfig.canonicalUrl),
           requestMethod: raw?.requestMethod ?? "GET",
-          responseHeaders: raw?.responseHeaders ?? {},
+          responseHeaders: sanitizeResponseHeaders(raw?.responseHeaders),
           retrievedAt: raw?.retrievedAt ?? new Date().toISOString(),
           httpStatus: raw?.httpStatus ?? null,
           mimeType: raw?.mimeType ?? "application/json",
