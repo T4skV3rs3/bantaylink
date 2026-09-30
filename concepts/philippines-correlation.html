@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BantayLink — Philippines Correlation Map Concept</title>
+<style>
+:root{
+  --bg:#f6f7f4;
+  --paper:#ffffff;
+  --paper-2:#fbfcfa;
+  --ink:#142018;
+  --muted:#6d776f;
+  --line:#dfe5df;
+  --line-2:#ebefeb;
+  --accent:#1f6b4f;
+  --accent-2:#cfe6d9;
+  --gold:#ae7b23;
+  --blue:#2f67a5;
+  --purple:#7254a6;
+  --red:#b85b5b;
+  --shadow:0 18px 50px rgba(22,39,28,.08);
+  --radius:18px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input{font:inherit}
+button{cursor:pointer}
+a{color:inherit;text-decoration:none}
+.app{min-height:100vh;display:grid;grid-template-columns:76px 1fr}
+.rail{border-right:1px solid var(--line);background:#f2f4f0;display:flex;flex-direction:column;align-items:center;padding:18px 0;gap:16px}
+.logo{width:42px;height:42px;border-radius:13px;background:var(--ink);color:white;display:grid;place-items:center;font:700 20px Georgia,serif;box-shadow:0 8px 18px rgba(20,32,24,.13)}
+.rail-sep{width:32px;height:1px;background:var(--line);margin:4px 0}
+.rail-btn{width:42px;height:42px;border:1px solid transparent;background:transparent;border-radius:12px;color:#7c867f;display:grid;place-items:center}
+.rail-btn.active{background:#fff;border-color:var(--line);color:var(--accent);box-shadow:0 6px 18px rgba(22,39,28,.05)}
+.rail-spacer{flex:1}
+.main{padding:24px 28px 42px;max-width:1600px;width:100%;margin:0 auto}
+.topbar{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:18px}
+.brand .kicker,.tiny{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.brand h1{margin:4px 0 7px;font:700 36px/1.04 Georgia,serif;letter-spacing:-.02em}
+.brand p{margin:0;color:var(--muted);max-width:760px}
+.actions{display:flex;align-items:center;gap:8px}
+.badge{padding:8px 11px;border:1px solid #d4e2d8;background:#f8fbf8;border-radius:999px;color:var(--accent);font-size:11px}
+.icon-btn{border:1px solid var(--line);background:var(--paper);width:38px;height:38px;border-radius:11px;color:#647069}
+.banner{display:flex;justify-content:space-between;gap:18px;align-items:center;padding:12px 15px;border:1px solid #e8dfc8;background:#fffdf7;border-radius:14px;margin-bottom:16px;color:#675528}
+.banner strong{color:#8b671f}
+.layout{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(370px,.75fr);gap:16px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.map-card{padding:18px}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:13px}
+.card-title{font-size:15px;font-weight:700}
+.card-copy{color:var(--muted);font-size:12px;margin-top:3px}
+.legend{display:flex;gap:11px;flex-wrap:wrap;justify-content:flex-end}
+.legend-item{display:flex;gap:5px;align-items:center;font-size:11px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.filters{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 10px}
+.filter{border:1px solid var(--line);background:#fafcf9;color:#717b74;border-radius:999px;padding:7px 10px;font-size:11px}
+.filter.active{border-color:#b9d2c3;background:#eef7f1;color:var(--accent)}
+.map-wrap{position:relative;border:1px solid var(--line-2);background:linear-gradient(180deg,#fcfdfa,#f4f8f4);border-radius:15px;overflow:hidden;min-height:620px}
+.map-wrap:before{content:"";position:absolute;inset:0;background:
+  linear-gradient(rgba(37,71,54,.04) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(37,71,54,.04) 1px,transparent 1px);
+background-size:34px 34px;pointer-events:none}
+.map-label{position:absolute;top:14px;left:14px;padding:7px 9px;border:1px solid var(--line);background:rgba(255,255,255,.9);border-radius:9px;font-size:10px;color:var(--muted);backdrop-filter:blur(8px)}
+svg{display:block;width:100%;height:620px}
+.island{fill:#dfeade;stroke:#bbccb9;stroke-width:1.5}
+.island.minor{fill:#e8eee6}
+.waterline{stroke:#cfe0d0;stroke-width:1;fill:none;opacity:.6}
+.jur-label{font-size:11px;fill:#748076;font-weight:600;letter-spacing:.02em}
+.point{cursor:pointer}
+.point circle.outer{fill:white;stroke-width:2}
+.point circle.core{stroke:white;stroke-width:1.5}
+.point text{font-size:10px;fill:#526057;font-weight:650}
+.point.selected circle.outer{stroke:var(--ink);stroke-width:2.5}
+.point.selected text{fill:var(--ink)}
+.corr-line{fill:none;stroke-linecap:round;stroke-dasharray:4 5;opacity:.75}
+.corr-line.hidden{display:none}
+.map-note{position:absolute;left:14px;bottom:14px;display:flex;gap:8px;align-items:center;color:var(--muted);font-size:10px;background:rgba(255,255,255,.92);border:1px solid var(--line);padding:8px 10px;border-radius:10px}
+.right{display:grid;grid-template-rows:auto auto 1fr;gap:12px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.kpi{padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--paper)}
+.kpi b{display:block;font:700 23px/1 Georgia,serif}
+.kpi span{display:block;color:var(--muted);font-size:10px;margin-top:4px}
+.side-card{padding:16px}
+.region-title{font:700 26px/1.08 Georgia,serif;margin-top:5px}
+.region-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.pill{display:inline-flex;align-items:center;border-radius:999px;padding:5px 8px;font-size:10px;border:1px solid transparent}
+.pill.green{background:#edf7f1;color:var(--accent);border-color:#d1e4d8}
+.pill.blue{background:#f0f5fb;color:var(--blue);border-color:#dae6f4}
+.pill.gold{background:#fcf7ea;color:var(--gold);border-color:#efe2bf}
+.pill.purple{background:#f5f1fb;color:var(--purple);border-color:#e3d9f2}
+.pill.red{background:#fbf0f0;color:var(--red);border-color:#efd7d7}
+.summary{margin:11px 0 0;color:#536059;font-size:12px}
+.stack{margin-top:15px;border-top:1px solid var(--line-2)}
+.row{padding:11px 0;border-bottom:1px solid var(--line-2)}
+.row:last-child{border-bottom:0}
+.row-head{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.row-title{font-weight:650}
+.row-sub{margin-top:3px;color:var(--muted);font-size:11px}
+.trace{display:flex;align-items:center;gap:7px;margin-top:10px}
+.trace span{padding:5px 8px;border:1px solid var(--line);background:#fafcf9;border-radius:8px;font-size:10px}
+.trace i{height:1px;background:var(--line);width:18px}
+.trace-dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.section-head h2{font-size:12px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);margin:0}
+.count{font-size:11px;color:var(--muted)}
+.scroll{max-height:358px;overflow:auto;padding-right:2px}
+.finding{padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:#fcfdfc;margin-top:8px;cursor:pointer}
+.finding:hover,.finding.selected{border-color:#b6c4ba;background:#f7faf7}
+.finding-head{display:flex;justify-content:space-between;gap:9px}
+.finding-title{font-weight:650;font-size:12px}
+.finding p{margin:5px 0 0;font-size:11px;color:#56625a}
+.finding-meta{display:flex;gap:9px;flex-wrap:wrap;margin-top:7px;font-size:10px;color:var(--muted)}
+.footer{margin-top:18px;color:var(--muted);font-size:10px}
+.search{min-width:210px;display:flex;gap:7px;align-items:center;border:1px solid var(--line);background:var(--paper);border-radius:11px;padding:8px 10px}
+.search input{border:0;outline:0;width:100%;background:transparent;color:var(--ink)}
+@media(max-width:1180px){.layout{grid-template-columns:1fr}.right{grid-template-columns:1fr 1fr;grid-template-rows:auto 1fr}.kpis{grid-column:1/-1}.side-card:last-child{grid-column:1/-1}}
+@media(max-width:760px){.app{grid-template-columns:1fr}.rail{display:none}.main{padding:18px 13px 34px}.topbar{flex-direction:column}.actions{width:100%;justify-content:space-between}.layout{grid-template-columns:1fr}.right{grid-template-columns:1fr}.brand h1{font-size:30px}.map-wrap,svg{min-height:500px;height:500px}.legend{justify-content:flex-start}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail" aria-label="Concept navigation">
+    <div class="logo">B</div>
+    <div class="rail-sep"></div>
+    <button class="rail-btn active" title="Correlation map">⌁</button>
+    <button class="rail-btn" title="Infrastructure">▤</button>
+    <button class="rail-btn" title="Evidence">◫</button>
+    <button class="rail-btn" title="Entity resolution">◎</button>
+    <div class="rail-spacer"></div>
+    <button class="rail-btn" title="Settings">⚙</button>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="brand">
+        <div class="kicker">BantayLink / Concept 02</div>
+        <h1>See where the records intersect.</h1>
+        <p>A map-first research view for connecting jurisdiction, election records, infrastructure, procurement, and audit evidence without collapsing a correlation into a conclusion.</p>
+      </div>
+      <div class="actions">
+        <span class="badge">STANDALONE CONCEPT · SAMPLE DATA</span>
+        <label class="search"><span>⌕</span><input id="search" placeholder="Filter region or entity…"></label>
+        <button class="icon-btn" id="reset" aria-label="Reset view">↺</button>
+      </div>
+    </header>
+
+    <div class="banner">
+      <div><strong>Interpretation guardrail:</strong> lines show data intersections and research leads. They are not findings of illegality, misconduct, influence, or causation.</div>
+      <div class="tiny">Designed to sit beside the evidence trail, not replace it.</div>
+    </div>
+
+    <div class="layout">
+      <section class="card map-card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Philippines correlation map</div>
+            <div class="card-copy">Schematic jurisdiction view — intentionally simplified for product exploration.</div>
+          </div>
+          <div class="legend">
+            <span class="legend-item"><span class="dot" style="background:var(--blue)"></span>Election</span>
+            <span class="legend-item"><span class="dot" style="background:var(--accent)"></span>Project</span>
+            <span class="legend-item"><span class="dot" style="background:var(--gold)"></span>Procurement</span>
+            <span class="legend-item"><span class="dot" style="background:var(--purple)"></span>Audit / FOI</span>
+          </div>
+        </div>
+
+        <div class="filters" id="filters"></div>
+
+        <div class="map-wrap">
+          <div class="map-label">Luzon · Visayas · Mindanao</div>
+          <svg viewBox="0 0 900 620" role="img" aria-label="Schematic Philippines correlation map">
+            <defs>
+              <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#38563f" flood-opacity=".09"/>
+              </filter>
+            </defs>
+            <path class="waterline" d="M60 120 C230 50 420 65 700 120 S850 340 730 510"/>
+            <path class="waterline" d="M140 520 C320 450 490 470 820 540"/>
+            <g filter="url(#soft)">
+              <path class="island" d="M240 74 C210 89 205 119 222 146 C229 159 224 181 205 198 C187 215 176 232 188 251 C202 271 191 296 206 319 C220 342 247 348 255 375 C263 402 286 421 303 407 C321 392 329 365 319 343 C310 322 321 302 337 286 C353 270 354 246 341 226 C330 210 334 189 347 168 C360 145 352 119 331 102 C313 87 284 66 240 74Z"/>
+              <path class="island minor" d="M358 267 C342 277 341 292 351 306 C360 319 377 326 388 316 C399 306 396 288 385 278 C376 269 367 265 358 267Z"/>
+              <path class="island minor" d="M394 331 C380 343 379 356 390 369 C400 380 420 381 430 369 C440 356 437 342 425 335 C415 329 405 326 394 331Z"/>
+              <path class="island minor" d="M454 312 C440 322 439 339 450 351 C461 363 479 365 490 353 C501 340 497 324 486 316 C476 309 464 308 454 312Z"/>
+              <path class="island" d="M494 358 C515 335 547 326 575 336 C601 345 617 363 642 370 C663 377 695 393 710 416 C724 437 716 463 696 477 C678 490 654 494 642 515 C630 538 599 548 575 534 C555 522 536 525 514 535 C488 546 461 535 452 512 C444 490 456 470 475 453 C495 435 501 411 488 392 C478 379 482 367 494 358Z"/>
+              <path class="island minor" d="M711 420 C700 426 697 439 705 449 C713 459 726 459 735 451 C743 442 740 429 731 423 C724 418 718 417 711 420Z"/>
+              <path class="island minor" d="M130 414 C116 421 111 435 120 447 C128 457 145 458 155 448 C165 438 162 424 151 417 C144 412 136 411 130 414Z"/>
+              <path class="island minor" d="M171 463 C158 469 155 483 163 493 C171 503 187 504 196 494 C204 484 201 471 191 465 C184 460 177 460 171 463Z"/>
+            </g>
+
+            <g class="jur-label">
+              <text x="260" y="130">LUZON</text>
+              <text x="375" y="286">VISAYAS</text>
+              <text x="570" y="448">MINDANAO</text>
+            </g>
+
+            <g id="links">
+              <path class="corr-line" data-link="metro-cebu" stroke="var(--blue)" stroke-width="2" d="M285 182 Q360 235 426 317"/>
+              <path class="corr-line" data-link="cebu-davao" stroke="var(--accent)" stroke-width="2" d="M426 317 Q505 368 592 446"/>
+              <path class="corr-line" data-link="camarines-davao" stroke="var(--gold)" stroke-width="2" d="M320 244 Q465 310 592 446"/>
+              <path class="corr-line" data-link="ilocos-metro" stroke="var(--purple)" stroke-width="2" d="M248 142 Q259 160 285 182"/>
+              <path class="corr-line" data-link="cebu-cam" stroke="var(--red)" stroke-width="2" d="M426 317 Q368 276 320 244"/>
+            </g>
+
+            <g id="points">
+              <g class="point" data-region="Ilocos Norte" data-links="ilocos-metro">
+                <circle class="outer" cx="248" cy="142" r="9" stroke="var(--purple)"/>
+                <circle class="core" cx="248" cy="142" r="4" fill="var(--purple)"/>
+                <text x="221" y="128">Ilocos Norte</text>
+              </g>
+              <g class="point" data-region="Metro Manila" data-links="metro-cebu,ilocos-metro">
+                <circle class="outer" cx="285" cy="182" r="11" stroke="var(--blue)"/>
+                <circle class="core" cx="285" cy="182" r="4.5" fill="var(--blue)"/>
+                <text x="296" y="181">Metro Manila</text>
+              </g>
+              <g class="point" data-region="Camarines Norte" data-links="camarines-davao,cebu-cam">
+                <circle class="outer" cx="320" cy="244" r="9" stroke="var(--gold)"/>
+                <circle class="core" cx="320" cy="244" r="4" fill="var(--gold)"/>
+                <text x="330" y="239">Camarines Norte</text>
+              </g>
+              <g class="point" data-region="Cebu" data-links="metro-cebu,cebu-davao,cebu-cam">
+                <circle class="outer" cx="426" cy="317" r="12" stroke="var(--accent)"/>
+                <circle class="core" cx="426" cy="317" r="5" fill="var(--accent)"/>
+                <text x="438" y="313">Cebu</text>
+              </g>
+              <g class="point" data-region="Iloilo" data-links="none">
+                <circle class="outer" cx="454" cy="351" r="8" stroke="var(--purple)"/>
+                <circle class="core" cx="454" cy="351" r="3.5" fill="var(--purple)"/>
+                <text x="465" y="368">Iloilo</text>
+              </g>
+              <g class="point" data-region="Davao City" data-links="cebu-davao,camarines-davao">
+                <circle class="outer" cx="592" cy="446" r="12" stroke="var(--accent)"/>
+                <circle class="core" cx="592" cy="446" r="5" fill="var(--accent)"/>
+                <text x="606" y="447">Davao City</text>
+              </g>
+              <g class="point" data-region="Misamis Oriental" data-links="none">
+                <circle class="outer" cx="515" cy="463" r="8" stroke="var(--blue)"/>
+                <circle class="core" cx="515" cy="463" r="3.5" fill="var(--blue)"/>
+                <text x="478" y="482">Misamis Oriental</text>
+              </g>
+            </g>
+          </svg>
+          <div class="map-note"><span class="trace-dot"></span> Click a jurisdiction to inspect the evidence intersections on the right.</div>
+        </div>
+      </section>
+
+      <aside class="right">
+        <div class="kpis">
+          <div class="kpi"><b id="kRegions">7</b><span>jurisdictions surfaced</span></div>
+          <div class="kpi"><b id="kLinks">5</b><span>research intersections</span></div>
+          <div class="kpi"><b id="kObs">14</b><span>evidence observations</span></div>
+        </div>
+
+        <section class="card side-card" id="regionCard"></section>
+
+        <section class="card side-card">
+          <div class="section-head">
+            <h2>Correlation queue</h2>
+            <span class="count" id="findingCount">5 leads</span>
+          </div>
+          <div class="scroll" id="findings"></div>
+        </section>
+      </aside>
+    </div>
+
+    <div class="footer">Concept data is illustrative. Production BantayLink should populate this view only from source-backed observations, explicit provenance links, and derived findings stored outside the source-backed edge layer.</div>
+  </main>
+</div>
+
+<script>
+const records = [
+  {
+    region:"Metro Manila",
+    label:"Metro Manila",
+    summary:"Dense cross-source activity centered on election-result records, project references, and downstream procurement traces.",
+    tags:[["ELECTION","blue"],["PROJECT","green"],["PROCUREMENT","gold"]],
+    stats:["4 entities","7 observations","2 joins"],
+    leads:[
+      ["ELECTION_PROJECT_OVERLAP","Election / project jurisdiction-year overlap","2025 · local government","blue"],
+      ["MULTI_SOURCE_PROJECT","Project appears across multiple source records","DPWH · FOI","green"]
+    ]
+  },
+  {
+    region:"Cebu",
+    label:"Cebu",
+    summary:"The concept highlights a municipality where project records, contractor activity, and election-year context can be inspected side by side.",
+    tags:[["PROJECT","green"],["CONTRACTOR","gold"],["INFERENCE LEAD","purple"]],
+    stats:["5 entities","10 observations","3 joins"],
+    leads:[
+      ["CONTRACTOR_PORTFOLIO","Contractor appears across multiple projects","PCAB-linked identity","gold"],
+      ["ELECTION_PROJECT_CONTRACTOR_INTERSECTION","Election/project + contractor intersection","Jurisdiction + year","purple"]
+    ]
+  },
+  {
+    region:"Camarines Norte",
+    label:"Camarines Norte",
+    summary:"A regional drill-down can show how an audit or FOI document is attached to a canonical project without changing the source-native wording.",
+    tags:[["AUDIT / FOI","purple"],["PROJECT","green"]],
+    stats:["3 entities","5 observations","2 joins"],
+    leads:[
+      ["MULTI_SOURCE_PROJECT","Project has observations from separate source adapters","DPWH · COA","green"],
+      ["STATUS_HISTORY","Published project status differs across observations","Historical record comparison","purple"]
+    ]
+  },
+  {
+    region:"Ilocos Norte",
+    label:"Ilocos Norte",
+    summary:"The map treats jurisdiction as a filterable research dimension; identity and family relationships stay separate evidence problems.",
+    tags:[["ELECTION","blue"],["DOCUMENT","purple"]],
+    stats:["2 entities","3 observations","1 join"],
+    leads:[
+      ["EVIDENCE_REFERENCE","Election record cross-references an official document","Source-backed trace","purple"]
+    ]
+  },
+  {
+    region:"Davao City",
+    label:"Davao City",
+    summary:"A project-centered view can fan into procurement and election context, while preserving every contributing observation.",
+    tags:[["PROJECT","green"],["PROCUREMENT","gold"],["ELECTION","blue"]],
+    stats:["4 entities","8 observations","2 joins"],
+    leads:[
+      ["CONTRACTOR_PORTFOLIO","Named contractor is present in multiple project observations","PCAB / source record","gold"],
+      ["ELECTION_PROJECT_OVERLAP","Jurisdiction and recorded year intersect","Municipal / year key","blue"]
+    ]
+  },
+  {
+    region:"Iloilo",
+    label:"Iloilo",
+    summary:"A low-density map point remains useful: absence of visible joins is itself different from a negative finding.",
+    tags:[["PROJECT","green"]],
+    stats:["1 entity","2 observations","0 joins"],
+    leads:[
+      ["PROJECT_ONLY","No correlation lead in this concept slice","Browse the source trail","green"]
+    ]
+  },
+  {
+    region:"Misamis Oriental",
+    label:"Misamis Oriental",
+    summary:"Source-backed records stay accessible even when no derived correlation exists in the current bounded run.",
+    tags:[["ELECTION","blue"]],
+    stats:["1 entity","2 observations","0 joins"],
+    leads:[
+      ["PROJECT_ONLY","No correlation lead in this concept slice","Browse the source trail","blue"]
+    ]
+  }
+];
+
+const filterDefs = [
+  ["all","All layers"],
+  ["election","Election"],
+  ["project","Project"],
+  ["procurement","Procurement"],
+  ["audit","Audit / FOI"]
+];
+
+let activeFilter="all";
+let selected="Cebu";
+
+const colorFor = kind => ({
+  blue:"var(--blue)", green:"var(--accent)", gold:"var(--gold)", purple:"var(--purple)", red:"var(--red)"
+}[kind] || "var(--accent)");
+
+function renderFilters(){
+  document.querySelector("#filters").innerHTML=filterDefs.map(([id,label]) =>
+    `<button class="filter ${activeFilter===id?"active":""}" data-filter="${id}">${label}</button>`
+  ).join("");
+  document.querySelectorAll("[data-filter]").forEach(btn=>{
+    btn.onclick=()=>{activeFilter=btn.dataset.filter;renderAll()};
+  });
+}
+
+function renderRegion(){
+  const r=records.find(x=>x.region===selected) || records[1];
+  const tags=r.tags.map(([label,kind])=>`<span class="pill ${kind}">${label}</span>`).join("");
+  const leadHtml=r.leads.map(([type,title,meta,kind])=>`
+    <div class="row">
+      <div class="row-head"><div class="row-title">${type}</div><span class="dot" style="background:${colorFor(kind)}"></span></div>
+      <div class="row-sub">${title}</div>
+      <div class="trace">
+        <span>Source</span><i></i><span>Observation</span><i></i><span>Finding</span>
+      </div>
+      <div class="row-sub">${meta}</div>
+    </div>`).join("");
+  document.querySelector("#regionCard").innerHTML=`
+    <div class="tiny">SELECTED JURISDICTION</div>
+    <div class="region-title">${r.label}</div>
+    <div class="region-meta">${tags}</div>
+    <p class="summary">${r.summary}</p>
+    <div class="stack">
+      <div class="row"><div class="row-head"><div class="row-title">Coverage</div><span class="count">${r.stats[0]}</span></div><div class="row-sub">${r.stats[1]} across the concept slice · ${r.stats[2]}</div></div>
+      ${leadHtml}
+    </div>
+  `;
+}
+
+function renderFindings(){
+  const q=(document.querySelector("#search").value||"").trim().toLowerCase();
+  const filterPass = (f)=>{
+    if(activeFilter==="all") return true;
+    const hay=(f.title+" "+f.type+" "+f.meta).toLowerCase();
+    return hay.includes(activeFilter==="audit"?"audit":activeFilter);
+  };
+  const regionPass = selected ? true : true;
+  const source = [
+    ["ELECTION_PROJECT_OVERLAP","Election and project share jurisdiction + recorded year","Cebu · 2025","blue"],
+    ["MULTI_SOURCE_PROJECT","Canonical project appears in more than one source record","Metro Manila · DPWH + FOI","green"],
+    ["CONTRACTOR_PORTFOLIO","Contractor identity key repeats across project observations","Cebu · 4 projects","gold"],
+    ["STATUS_HISTORY","Published status/progress differs across observations","Camarines Norte · 3 observations","purple"],
+    ["ELECTION_PROJECT_CONTRACTOR_INTERSECTION","Election/project intersection plus named contractor","Davao City · 2025","blue"]
+  ].filter(f=>filterPass({type:f[0],title:f[1],meta:f[2]}) && (!q || f.join(" ").toLowerCase().includes(q)));
+  document.querySelector("#findingCount").textContent=source.length+" lead"+(source.length===1?"":"s");
+  document.querySelector("#findings").innerHTML=source.length?source.map((f,i)=>`
+    <div class="finding ${i===0?"selected":""}" data-finding="${i}">
+      <div class="finding-head"><div class="finding-title">${f[0]}</div><span class="pill ${f[3]}">RESEARCH LEAD</span></div>
+      <p>${f[1]}</p>
+      <div class="finding-meta"><span>${f[2]}</span><span>evidence trail →</span></div>
+    </div>`).join(""):`<div style="padding:28px;text-align:center;color:var(--muted);font-size:12px">No concept findings match this filter.</div>`;
+}
+
+function syncMap(){
+  document.querySelectorAll(".point").forEach(p=>{
+    p.classList.toggle("selected",p.dataset.region===selected);
+  });
+  const visible = {
+    all:["metro-cebu","cebu-davao","camarines-davao","ilocos-metro","cebu-cam"],
+    election:["metro-cebu"],
+    project:["cebu-davao","camarines-davao"],
+    procurement:["camarines-davao"],
+    audit:["ilocos-metro","cebu-cam"]
+  }[activeFilter] || [];
+  document.querySelectorAll(".corr-line").forEach(line=>{
+    line.classList.toggle("hidden",!visible.includes(line.dataset.link));
+  });
+}
+
+function renderAll(){
+  renderFilters();
+  renderRegion();
+  renderFindings();
+  syncMap();
+}
+
+document.querySelectorAll(".point").forEach(p=>{
+  p.addEventListener("click",()=>{
+    selected=p.dataset.region;
+    renderAll();
+  });
+});
+
+document.querySelector("#search").addEventListener("input",()=>{
+  renderFindings();
+  const q=document.querySelector("#search").value.trim().toLowerCase();
+  const hit=records.find(r=>(r.region+" "+r.summary).toLowerCase().includes(q));
+  if(q && hit){selected=hit.region;renderRegion();syncMap();}
+});
+
+document.querySelector("#reset").onclick=()=>{
+  activeFilter="all";selected="Cebu";document.querySelector("#search").value="";renderAll();
+};
+
+renderAll();
+</script>
+</body>
+</html>
