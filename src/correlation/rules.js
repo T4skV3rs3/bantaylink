@@ -119,7 +119,7 @@ function baseFinding({
   };
 
   return {
-    id: findingFingerprint(stable),
+    id: null,
     ruleId,
     findingType,
     status,
