@@ -162,6 +162,7 @@ export class MemoryStore {
       reviewRequiredCount: 0,
       conflictCount: 0,
       clusterCount: 0,
+      truncated: false,
       errors: []
     };
     if (!this.entityResolutionRuns) this.entityResolutionRuns = new Map();
