@@ -23,6 +23,11 @@ export default async function handler(req, res) {
     await pool.query("SELECT 1");
     return res.status(200).json({ ...response, database: "reachable" });
   } catch (error) {
+    console.error("[health] database connection failed", {
+      name: error?.name,
+      code: error?.code,
+      constructor: error?.constructor?.name
+    });
     return res.status(503).json({
       ...response,
       status: "degraded",
