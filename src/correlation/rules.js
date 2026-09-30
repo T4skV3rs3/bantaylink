@@ -110,6 +110,11 @@ function createObservationIndex(snapshot) {
   return byEntity;
 }
 
+function entityObservations(observationIndex, entityId, recordType) {
+  return (observationIndex.get(entityId) ?? [])
+    .filter(row => !recordType || row.recordType === recordType);
+}
+
 function projectEntities(snapshot) {
   return snapshot.entities.filter(entity => entity.entityType === "project");
 }
@@ -159,7 +164,7 @@ export function findProjectStatusHistories(snapshot, observationIndex = createOb
   const findings = [];
 
   for (const project of projectEntities(snapshot)) {
-    const observations = observationIndex.get(project.id) ?? [];
+    const observations = entityObservations(observationIndex, project.id, "project");
     if (observations.length < 2) continue;
 
     const states = observations.map(obs => ({
@@ -295,7 +300,7 @@ export function findContractorPortfolios(snapshot, observationIndex = createObse
       },
       relatedEntityIds: projectRows.map(project => project.id),
       evidenceObservationIds: projectRows.flatMap(project =>
-        (observationIndex.get(project.id) ?? []).map(obs => obs.id)
+        entityObservations(observationIndex, project.id, "project").map(obs => obs.id)
       ),
       payload: {
         statement: "The same contractor identity key appears in multiple canonical project records.",
@@ -490,8 +495,8 @@ export function findElectionProjectContractorOverlaps(snapshot, observationIndex
         subjectEntityId: election.id,
         relatedEntityIds: [project.id],
         evidenceObservationIds: [
-          ...(observationIndex.get(project.id) ?? []).map(obs => obs.id),
-          ...(observationIndex.get(election.id) ?? []).map(obs => obs.id)
+          ...entityObservations(observationIndex, project.id, "project").map(obs => obs.id),
+          ...entityObservations(observationIndex, election.id, "election_result").map(obs => obs.id)
         ],
         payload: {
           statement: "An election record, project and named contractor intersect on documented jurisdiction and year.",
