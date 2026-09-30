@@ -112,7 +112,11 @@ function projectEntities(snapshot) {
 }
 
 function electionEntities(snapshot) {
-  return snapshot.entities.filter(entity => entity.entityType === "election_result");
+  return snapshot.entities.filter(
+    entity =>
+      entity.entityType === "election_result" &&
+      entity.data?.dataset !== "NLE_Vote_Counts_2007-2025"
+  );
 }
 
 function baseFinding({
