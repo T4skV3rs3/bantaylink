@@ -72,7 +72,12 @@ const rawBodyAdapter = {
       rawContent: rawBody,
       hashScope: "raw_content",
       mimeType: "text/html",
-      url: "https://example.invalid/raw?token=secret"
+      url: "https://example.invalid/raw?token=secret",
+      responseHeaders: {
+        "content-type": "text/html",
+        "set-cookie": "session=secret",
+        "x-test": "safe"
+      }
     };
   },
   normalize(record) {
@@ -95,6 +100,9 @@ await ingestAdapter({ adapter: rawBodyAdapter, store: rawBodyStore });
 const storedRawBody = [...rawBodyStore.rawDocuments.values()][0];
 if (storedRawBody.payload !== rawBody) throw new Error("Exact raw response body was not retained.");
 if (storedRawBody.hashScope !== "raw_content") throw new Error("Raw body hash scope was not retained.");
+if (storedRawBody.retrievalUrl.includes("secret")) throw new Error("Sensitive retrieval query parameter was not redacted.");
+if (storedRawBody.responseHeaders["set-cookie"] !== "[REDACTED]") throw new Error("Sensitive response header was not redacted.");
+if (storedRawBody.responseHeaders["x-test"] !== "safe") throw new Error("Non-sensitive response header was altered.");
 
 const partialStore = new MemoryStore();
 const partialAdapter = {
