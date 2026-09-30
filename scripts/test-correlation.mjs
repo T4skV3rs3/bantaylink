@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { runCorrelation, CORRELATION_ENGINE_VERSION } from "../src/correlation/engine.js";
+import { executeCorrelationRun, runCorrelation, CORRELATION_ENGINE_VERSION } from "../src/correlation/engine.js";
 import { MemoryStore } from "../src/db/memory.js";
 
 function entity(id, entityType, canonicalKey, data = {}, label = canonicalKey) {
@@ -163,24 +163,14 @@ for (const obs of observations) {
   await store.insertObservation(obs);
 }
 
-const persistedSnapshot = await store.getCorrelationSnapshot();
-const persistedRun = runCorrelation({ snapshot: persistedSnapshot, maxFindings: 2 });
-await store.startCorrelationRun({
-  id: persistedRun.run.id,
-  engineVersion: persistedRun.run.engineVersion
-});
-for (const finding of persistedRun.findings) {
-  await store.insertCorrelationFinding(persistedRun.run.id, finding);
-}
-const stored = await store.completeCorrelationRun(persistedRun.run.id, {
-  entityCount: persistedRun.run.entityCount,
-  observationCount: persistedRun.run.observationCount,
-  edgeCount: persistedRun.run.edgeCount,
-  findingCount: persistedRun.findings.length,
-  errors: []
+const stored = await executeCorrelationRun({
+  store,
+  maxFindings: 2
 });
 
 assert.equal(store.correlationFindings.size, 2);
 assert.equal(stored.findingCount, 2);
+assert.equal(stored.engineVersion, CORRELATION_ENGINE_VERSION);
+assert.equal(stored.status, "completed");
 
 console.log("Correlation engine v0.5 tests passed.");
