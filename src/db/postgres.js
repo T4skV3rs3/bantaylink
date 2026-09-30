@@ -333,7 +333,8 @@ export function createPostgresStore(pool) {
                    entity_count AS "entityCount", candidate_count AS "candidateCount",
                    auto_confirmed_count AS "autoConfirmedCount",
                    review_required_count AS "reviewRequiredCount",
-                   conflict_count AS "conflictCount", errors`,
+                   conflict_count AS "conflictCount", cluster_count AS "clusterCount",
+                   truncated, errors`,
         [input.id, input.engineVersion]
       );
       return result.rows[0];
@@ -344,9 +345,9 @@ export function createPostgresStore(pool) {
       const result = await pool.query(
         `INSERT INTO entity_resolution_candidates
           (id, entity_resolution_run_id, source_entity_id, candidate_entity_id,
-           entity_type, match_method, status, fingerprint, rationale,
+           entity_type, identity_group_key, match_method, status, fingerprint, rationale,
            evidence_observation_ids, evidence_edge_ids, payload)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb)
          ON CONFLICT (entity_resolution_run_id, fingerprint) DO UPDATE
            SET status=EXCLUDED.status, rationale=EXCLUDED.rationale,
                evidence_observation_ids=EXCLUDED.evidence_observation_ids,
@@ -355,13 +356,13 @@ export function createPostgresStore(pool) {
          RETURNING id, entity_resolution_run_id AS "entityResolutionRunId",
                    source_entity_id AS "sourceEntityId",
                    candidate_entity_id AS "candidateEntityId",
-                   entity_type AS "entityType", match_method AS "matchMethod",
-                   status, fingerprint, rationale,
+                   entity_type AS "entityType", identity_group_key AS "identityGroupKey",
+                   match_method AS "matchMethod", status, fingerprint, rationale,
                    evidence_observation_ids AS "evidenceObservationIds",
                    evidence_edge_ids AS "evidenceEdgeIds", payload`,
         [
           id, runId, candidate.sourceEntityId, candidate.candidateEntityId,
-          candidate.entityType, candidate.matchMethod, candidate.status,
+          candidate.entityType, candidate.identityGroupKey ?? null, candidate.matchMethod, candidate.status,
           candidate.fingerprint, candidate.rationale,
           candidate.evidenceObservationIds, candidate.evidenceEdgeIds,
           JSON.stringify(candidate.payload ?? {})
@@ -414,12 +415,13 @@ export function createPostgresStore(pool) {
       const result = await pool.query(
         `INSERT INTO entity_resolution_assertions
           (id, source_entity_id, canonical_entity_id, assertion_type, resolution_run_id,
-           evidence_observation_ids, evidence_edge_ids, basis)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)
+           identity_group_key, evidence_observation_ids, evidence_edge_ids, basis)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)
          RETURNING id, source_entity_id AS "sourceEntityId",
                    canonical_entity_id AS "canonicalEntityId",
                    assertion_type AS "assertionType",
                    resolution_run_id AS "resolutionRunId",
+                   identity_group_key AS "identityGroupKey",
                    evidence_observation_ids AS "evidenceObservationIds",
                    evidence_edge_ids AS "evidenceEdgeIds",
                    basis, created_at AS "createdAt"`,
@@ -429,6 +431,7 @@ export function createPostgresStore(pool) {
           assertion.canonicalEntityId,
           assertion.assertionType,
           assertion.resolutionRunId ?? null,
+          assertion.identityGroupKey ?? null,
           assertion.evidenceObservationIds ?? [],
           assertion.evidenceEdgeIds ?? [],
           JSON.stringify(assertion.basis ?? {})
