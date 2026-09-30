@@ -28,7 +28,23 @@ Implemented: OpenHalalan winners/vote counts, DPWH Transparency project API and 
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md), [ADAPTERS.md](./ADAPTERS.md), and [SOURCES.md](./SOURCES.md).
 
-## Correlation engine v0.5
+## Entity resolution v1.0
+
+BantayLink now has a conservative entity-resolution pipeline in \`src/resolution/engine.js\`. It separates source identity records from derived canonical identities and creates reviewable candidate matches. Exact external identifiers can produce identifier-backed organization identities; person matches from names/locality remain \`INFERENCE_LEAD\` candidates and are not silently merged.
+
+Run after provenance data is populated:
+
+\`\`\`bash
+npm run resolve
+\`\`\`
+
+Use \`BANTAYLINK_MAX_RESOLUTION_CANDIDATES\` to bound a run for testing.
+
+## Evidence UI
+
+The web UI includes **Entity resolution**, **Correlations**, and **Evidence trail** views. The evidence view is backed by \`/api/evidence\` and exposes the entity, observations, raw retrieval metadata, hashes, repeat-run occurrence counts, and source-backed edges that sit beneath a selected record or finding.
+
+# Correlation engine v0.5
 
 The v0.5 correlation engine produces source-referenced findings without mutating source-backed edges. It detects project status histories, multi-source project observations, contractor project portfolios, and election/project jurisdiction-year intersections. Intersections are labeled `INFERENCE_LEAD`; the engine does not infer causation, misconduct, or political relationships.
 
