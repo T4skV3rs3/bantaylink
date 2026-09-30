@@ -239,6 +239,7 @@ export class MemoryStore {
       observationCount: 0,
       edgeCount: 0,
       findingCount: 0,
+      truncated: false,
       errors: []
     };
     if (!this.correlationRuns) this.correlationRuns = new Map();
