@@ -407,7 +407,8 @@ export function createPostgresStore(pool) {
                    auto_confirmed_count AS "autoConfirmedCount",
                    review_required_count AS "reviewRequiredCount",
                    conflict_count AS "conflictCount",
-                   cluster_count AS "clusterCount", errors`,
+                   cluster_count AS "clusterCount",
+                   truncated, errors`,
         [
           id, patch.entityCount, patch.candidateCount,
           patch.autoConfirmedCount, patch.reviewRequiredCount,
