@@ -203,7 +203,8 @@ export function createPostgresStore(pool) {
          FROM entities
          WHERE entity_type='project'
             OR (entity_type='election_result'
-                AND COALESCE(data->>'dataset','') <> 'NLE_Vote_Counts_2007-2025')`
+                AND (data->>'dataset' = 'NLE_Winners_2004-2025'
+                     OR data->>'dataset' IS NULL))`
       );
 
       const entityIds = entities.rows.map(row => row.id);
