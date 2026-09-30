@@ -176,7 +176,8 @@ ON CONFLICT DO NOTHING;
 CREATE OR REPLACE FUNCTION bantaylink_prevent_provenance_mutation()
 RETURNS trigger
 LANGUAGE plpgsql
-AS $$
+SET search_path = pg_catalog
+AS $
 BEGIN
   RAISE EXCEPTION 'BantayLink provenance table % is append-only; % is not permitted',
     TG_TABLE_NAME, TG_OP;
@@ -224,6 +225,45 @@ CREATE TABLE IF NOT EXISTS correlation_runs (
 
 ALTER TABLE correlation_runs
   ADD COLUMN IF NOT EXISTS truncated BOOLEAN NOT NULL DEFAULT FALSE;
+
+
+-- BantayLink is accessed through trusted backend/database connections.
+-- Keep public-schema tables behind RLS with no anon/authenticated policies.
+ALTER TABLE public.sources ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ingestion_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.raw_documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.entities ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.observations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.observation_occurrences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.edges ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.edge_occurrences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.correlation_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.correlation_findings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.entity_resolution_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.entity_resolution_candidates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.entity_resolution_assertions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.entity_resolution_clusters ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE
+  public.sources,
+  public.ingestion_runs,
+  public.raw_documents,
+  public.entities,
+  public.observations,
+  public.observation_occurrences,
+  public.edges,
+  public.edge_occurrences,
+  public.correlation_runs,
+  public.correlation_findings,
+  public.entity_resolution_runs,
+  public.entity_resolution_candidates,
+  public.entity_resolution_assertions,
+  public.entity_resolution_clusters
+FROM anon, authenticated;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLES FROM anon, authenticated;
+
 
 CREATE TABLE IF NOT EXISTS correlation_findings (
   id TEXT PRIMARY KEY,
@@ -379,7 +419,8 @@ CREATE INDEX IF NOT EXISTS idx_entity_resolution_clusters_type
 CREATE OR REPLACE FUNCTION bantaylink_prevent_resolution_assertion_mutation()
 RETURNS trigger
 LANGUAGE plpgsql
-AS $$
+SET search_path = pg_catalog
+AS $
 BEGIN
   RAISE EXCEPTION 'BantayLink resolution assertions are append-only; % is not permitted', TG_OP;
 END;
