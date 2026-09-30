@@ -97,12 +97,24 @@ const philgeps = normalizePhilgepsRecord({
   "Reference Number": "ABC-123",
   "Project Title": "Road repair",
   "Procuring Entity": "Test LGU",
+  "Procuring Entity ID": "LGU-1",
   "Award Amount": "1,234,567.00",
-  "Awardee": "Test Builder"
+  "Awardee": "Test Builder",
+  "Merchant ID": "MER-9",
+  "Province": "Test Province",
+  "City": "Test City",
+  "Posting Date": "2025-01-01",
+  "Award Date": "2025-02-01"
 }, "hash-philgeps", "https://open.philgeps.gov.ph/data/example.csv");
 assert.equal(philgeps.entities[0].entityType, "procurement_event");
 assert.equal(philgeps.entities[0].canonicalKey, "philgeps:ABC-123");
 assert.equal(philgeps.entities[0].data.awardAmount, 1234567);
 assert.equal(philgeps.entities[0].data.awardee, "Test Builder");
+assert.equal(philgeps.entities.length, 3);
+assert.equal(philgeps.edges.length, 2);
+assert(philgeps.entities.some(entity => entity.entityType === "organization" && entity.data.merchantId === "MER-9"));
+assert(philgeps.entities.some(entity => entity.entityType === "organization" && entity.data.sourceOrganizationId === "LGU-1"));
+assert(philgeps.edges.some(edge => edge.edgeType === "awarded_to"));
+assert(philgeps.edges.some(edge => edge.edgeType === "procured_by"));
 
 console.log("Adapter normalization checks passed.");
