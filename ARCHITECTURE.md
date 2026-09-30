@@ -22,13 +22,13 @@ The database is append-oriented around source observations.
 
 `ingestion_runs` records every adapter execution, resolved source version, counters, timestamps, and errors.
 
-`raw_documents` preserves each retrieved payload plus retrieval metadata and a SHA-256 content hash. Raw retrievals are retained across runs so repeat pulls remain auditable.
+`raw_documents` preserves each retrieved payload plus canonical/retrieval URLs, request method, response headers, retrieval time, payload encoding, hash scope, and a SHA-256 content hash. Raw retrievals are retained across runs so repeat pulls remain auditable. Document adapters may supply raw response text so the hash can cover the exact body; row-oriented adapters use a canonical structured-payload hash.
 
 `entities` stores canonical identities using `entity_type + canonical_key`. Entity data can be refreshed, but historical observations remain separate.
 
-`observations` stores the normalized source-backed state of an entity. Each observation points to its source, ingestion run, raw document, source record ID, retrieval time, and content hash.
+`observations` stores the normalized source-backed state of an entity. Each observation points to its source, original ingestion run, raw document, source record ID, observation time, and content hash. `observation_occurrences` records every later run/raw-document pair that saw the same immutable observation, so a deduplicated observation is not detached from repeat retrieval history.
 
-`edges` stores source-backed relationships between entities with the same provenance fields as observations.
+`edges` stores source-backed relationships between entities with the same provenance fields as observations. `edge_occurrences` performs the same repeat-run traceability function for deduplicated source-backed edges.
 
 This gives us an auditable chain:
 
