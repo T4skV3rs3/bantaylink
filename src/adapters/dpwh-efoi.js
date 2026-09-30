@@ -43,8 +43,14 @@ export const dpwhEfoiAdapter = {
           html
         },
         url,
+        retrievalUrl: response.url,
+        requestMethod: "GET",
+        responseHeaders: headersToObject(response.headers),
         httpStatus: response.status,
-        mimeType: response.headers.get("content-type") || "text/html"
+        mimeType: response.headers.get("content-type") || "text/html",
+        payloadEncoding: "utf-8",
+        hashScope: "raw_content",
+        rawContent: html
       };
     }
   },
