@@ -39,6 +39,7 @@ export function runEntityResolution({ snapshot, maxCandidates } = {}) {
       clusterCount: clusters.length,
       truncated: Boolean(result.truncated),
       errors: []
+
     },
     candidates: result.candidates,
     clusters
