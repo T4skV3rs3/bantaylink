@@ -31,7 +31,7 @@ function pushRunError(run, error, options) {
 }
 
 function safeSourceSnapshot(sourceConfig) {
-  const blocked = /^(api[_-]?key|token|secret|password|authorization|cookie|session)$/i;
+  const blocked = /^(api[_-]?key|access[_-]?token|authorization|token|secret|password|cookie|session|credential)s?$/i;
 
   function visit(value) {
     if (Array.isArray(value)) return value.map(visit);
@@ -169,7 +169,7 @@ export async function ingestAdapter({ adapter, store, options = {} }) {
           hashAlgorithm: "sha256",
           hashScope,
           contentHash,
-          payload: raw?.payload ?? raw?.rawContent ?? raw
+          payload: raw?.rawContent ?? raw?.payload ?? raw
         });
 
         const normalized = await adapter.normalize(rawPayload, {
