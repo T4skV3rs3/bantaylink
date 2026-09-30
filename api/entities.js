@@ -35,7 +35,9 @@ export default async function handler(req, res) {
          e.label, e.data, e.first_seen_at AS "firstSeenAt", e.last_seen_at AS "lastSeenAt",
          COALESCE(obs.observation_count, 0)::int AS "observationCount",
          COALESCE(ed.edge_count, 0)::int AS "edgeCount",
-         COALESCE(rc.review_count, 0)::int AS "reviewCandidateCount"
+         COALESCE(rc.review_count, 0)::int AS "reviewCandidateCount",
+         COALESCE(ac.auto_count, 0)::int AS "autoConfirmedCandidateCount",
+         COALESCE(cc.conflict_count, 0)::int AS "conflictCandidateCount"
        FROM entities e
        LEFT JOIN (
          SELECT entity_id, COUNT(*) AS observation_count
@@ -51,11 +53,44 @@ export default async function handler(req, res) {
          GROUP BY entity_id
        ) ed ON ed.entity_id=e.id
        LEFT JOIN (
-         SELECT source_entity_id AS entity_id, COUNT(*) AS review_count
-         FROM entity_resolution_candidates
-         WHERE status='REVIEW_REQUIRED'
-         GROUP BY source_entity_id
+         SELECT entity_id, COUNT(*) AS review_count
+         FROM (
+           SELECT source_entity_id AS entity_id
+           FROM entity_resolution_candidates
+           WHERE status='REVIEW_REQUIRED'
+           UNION ALL
+           SELECT candidate_entity_id AS entity_id
+           FROM entity_resolution_candidates
+           WHERE status='REVIEW_REQUIRED'
+         ) review_entities
+         GROUP BY entity_id
        ) rc ON rc.entity_id=e.id
+       LEFT JOIN (
+         SELECT entity_id, COUNT(*) AS auto_count
+         FROM (
+           SELECT source_entity_id AS entity_id
+           FROM entity_resolution_candidates
+           WHERE status='AUTO_CONFIRMED'
+           UNION ALL
+           SELECT candidate_entity_id AS entity_id
+           FROM entity_resolution_candidates
+           WHERE status='AUTO_CONFIRMED'
+         ) auto_entities
+         GROUP BY entity_id
+       ) ac ON ac.entity_id=e.id
+       LEFT JOIN (
+         SELECT entity_id, COUNT(*) AS conflict_count
+         FROM (
+           SELECT source_entity_id AS entity_id
+           FROM entity_resolution_candidates
+           WHERE status='CONFLICT'
+           UNION ALL
+           SELECT candidate_entity_id AS entity_id
+           FROM entity_resolution_candidates
+           WHERE status='CONFLICT'
+         ) conflict_entities
+         GROUP BY entity_id
+       ) cc ON cc.entity_id=e.id
        WHERE ($1::text = '' OR e.entity_type=$1)
          AND (
            $2::text = ''
