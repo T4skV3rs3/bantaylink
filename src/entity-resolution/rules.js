@@ -1,10 +1,11 @@
 import { sha256 } from "../ingestion/hash.js";
 
-export const ENTITY_RESOLUTION_ENGINE_VERSION = "1.2.0";
+export const ENTITY_RESOLUTION_ENGINE_VERSION = "1.3.0";
 
 const WINNER_DATASET = "NLE_Winners_2004-2025";
 const MAX_EVIDENCE_IDS_PER_ENTITY = 200;
 const MAX_NAME_VARIANTS = 6;
+const MAX_BLOCK_COMPARISONS = 200000;
 
 const ENTITY_TYPES = new Set([
   "project",
@@ -33,7 +34,6 @@ function normalizeText(value) {
 export function normalizeName(value) {
   return normalizeText(value)
     .replace(/\b(HON|HONORABLE|ATTY|ATTORNEY|DR|MR|MS|MRS|ENGR|ENGINEER|GOV|GOVERNOR|MAYOR|VICE MAYOR|CONG|CONGRESSMAN|CONGRESSWOMAN|REP)\b/g, " ")
-    .replace(/\b(JR|SR|II|III|IV|V|VI|VII|VIII)\b/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -103,8 +103,8 @@ function nameVariants(data) {
   if (full && full.includes(",")) {
     const parts = full.split(",").map(clean).filter(Boolean);
     if (parts.length === 2) {
-      values.add([parts[1], parts[0]].join(" "));
-      values.add([parts[0], parts[1]].join(" "));
+      values.add(parts[1] + " " + parts[0]);
+      values.add(parts[0] + " " + parts[1]);
     }
   }
 
@@ -168,9 +168,15 @@ function projectDescriptor(entity) {
   if (!normalizedTitle) return null;
 
   const years = new Set(
-    [data.infraYear, data.year, data.projectYear, yearFromDate(data.startDate),
-      yearFromDate(data.contractEffectivityDate), yearFromDate(data.expiryDate),
-      yearFromDate(data.completionDate)]
+    [
+      data.infraYear,
+      data.year,
+      data.projectYear,
+      yearFromDate(data.startDate),
+      yearFromDate(data.contractEffectivityDate),
+      yearFromDate(data.expiryDate),
+      yearFromDate(data.completionDate)
+    ]
       .map(numeric)
       .filter(Boolean)
   );
@@ -178,6 +184,7 @@ function projectDescriptor(entity) {
   return {
     title,
     normalizedTitle,
+    tokens: normalizedTitle.split(" ").filter(Boolean),
     city: normalizePlace(data.city ?? data.municipality ?? data.location?.city ?? data.location?.municipality),
     province: normalizePlace(data.province ?? data.location?.province),
     region: normalizePlace(data.region ?? data.location?.region),
@@ -202,6 +209,7 @@ function procurementDescriptor(entity) {
   return {
     title,
     normalizedTitle,
+    tokens: normalizedTitle.split(" ").filter(Boolean),
     city: normalizePlace(data.city ?? data.municipality ?? data.location?.city ?? data.location?.municipality),
     province: normalizePlace(data.province ?? data.location?.province),
     region: normalizePlace(data.region ?? data.location?.region),
@@ -247,7 +255,6 @@ function stableExternalIdentifiers(entity) {
   if (entity.entityType === "source") {
     add("document_id", data.documentId);
     add("tracking_number", data.trackingNumber);
-    add("source_url", data.url ?? data.canonicalUrl);
   }
 
   if (entity.entityType === "person" || entity.entityType === "election_result") {
@@ -256,6 +263,12 @@ function stableExternalIdentifiers(entity) {
   }
 
   return out;
+}
+
+function firstObservation(snapshot, entityId) {
+  return snapshot.observations
+    .filter(item => item.entityId === entityId)
+    .sort((a, b) => String(a.id).localeCompare(String(b.id)))[0] ?? null;
 }
 
 function observationIndex(snapshot) {
@@ -304,7 +317,6 @@ function makeCandidate({
   payload = {}
 }) {
   const ordered = a.canonicalKey.localeCompare(b.canonicalKey) <= 0 ? [a, b] : [b, a];
-
   return {
     id: null,
     fingerprint: candidateFingerprint(matchMethod, identityGroupKey, ordered[0], ordered[1]),
@@ -358,7 +370,6 @@ function projectContextMatch(a, b) {
   const sameRegion = Boolean(a.region && b.region && a.region === b.region);
   const sameYear = sameArraySet(a.years, b.years);
   const closeAmount = amountClose(a.amount, b.amount);
-
   const titleMatch = titleExact || similarity >= 0.92;
   const contextCount = [sameCity, sameProvince, sameRegion, sameYear, closeAmount].filter(Boolean).length;
 
@@ -382,7 +393,6 @@ function personContextMatch(a, b) {
   const sameSex = Boolean(a.sex && b.sex && a.sex === b.sex);
   const sexConflict = Boolean(a.sex && b.sex && a.sex !== b.sex);
   const yearGap = a.year != null && b.year != null ? Math.abs(a.year - b.year) : null;
-
   return { sameCity, sameProvince, samePosition, sameSex, sexConflict, yearGap };
 }
 
@@ -391,6 +401,7 @@ function personCandidateMatch(a, b) {
   if (!sharedName) return null;
 
   const context = personContextMatch(a, b);
+  if (context.sexConflict) return null;
 
   if (context.sameCity && context.sameProvince) {
     return {
@@ -398,14 +409,12 @@ function personCandidateMatch(a, b) {
       rationale: "The records share a normalized full-name variant and the same recorded city/municipality and province. This remains a review candidate and does not establish that they are the same real-world person."
     };
   }
-
   if (context.sameProvince) {
     return {
       method: "name_province_candidate",
       rationale: "The records share a normalized full-name variant and the same recorded province, but not the same complete locality context. This remains a research candidate and is not identity proof."
     };
   }
-
   if (context.samePosition && context.yearGap != null && context.yearGap <= 8 &&
       (a.city || a.province || b.city || b.province)) {
     return {
@@ -413,50 +422,90 @@ function personCandidateMatch(a, b) {
       rationale: "The records share a normalized full-name variant and compatible office/time context. This remains a research candidate and is not identity proof."
     };
   }
-
   return null;
 }
 
-function organizationNameCandidates(entities) {
-  const index = new Map();
-  for (const entity of entities) {
-    const descriptor = organizationDescriptor(entity);
-    if (!descriptor) continue;
-    const list = index.get(descriptor.name) ?? [];
-    list.push({ entity, descriptor });
-    index.set(descriptor.name, list);
+function blockKeys(descriptor) {
+  const keys = new Set();
+  keys.add("exact:" + descriptor.normalizedTitle);
+
+  const significantTokens = [...new Set(descriptor.tokens)]
+    .filter(token => token.length >= 5)
+    .sort((a, b) => b.length - a.length || a.localeCompare(b))
+    .slice(0, 2);
+
+  for (const year of descriptor.years) {
+    for (const token of significantTokens) {
+      if (descriptor.city) keys.add("city-year-token:" + descriptor.city + "::" + year + "::" + token);
+      if (descriptor.province) keys.add("province-year-token:" + descriptor.province + "::" + year + "::" + token);
+      if (descriptor.region) keys.add("region-year-token:" + descriptor.region + "::" + year + "::" + token);
+    }
   }
-  return index;
+
+  if (!descriptor.years.length) {
+    for (const token of significantTokens) {
+      if (descriptor.city) keys.add("city-token:" + descriptor.city + "::" + token);
+      if (descriptor.province) keys.add("province-token:" + descriptor.province + "::" + token);
+    }
+  }
+
+  return [...keys];
 }
 
-function personNameCandidates(entities) {
+function createBlocks(descriptors) {
   const index = new Map();
-  for (const entity of entities) {
-    const descriptor = personDescriptor(entity);
-    if (!descriptor) continue;
-    for (const name of descriptor.names) {
-      const list = index.get(name) ?? [];
-      list.push({ entity, descriptor });
-      index.set(name, list);
+  for (const descriptor of descriptors) {
+    for (const key of blockKeys(descriptor)) {
+      const list = index.get(key) ?? [];
+      list.push(descriptor);
+      index.set(key, list);
     }
   }
   return index;
 }
 
-function stableIndex(entities) {
-  const index = new Map();
-  for (const entity of entities) {
-    for (const external of stableExternalIdentifiers(entity)) {
-      const list = index.get(external.key) ?? [];
-      list.push({ entity, external });
-      index.set(external.key, list);
+function identityRecordForEntity(snapshot, entity, obsIndex) {
+  const observation = firstObservation(snapshot, entity.id);
+  const person = personDescriptor(entity);
+  const organization = organizationDescriptor(entity);
+  const external = stableExternalIdentifiers(entity)[0] ?? null;
+  const displayName = person?.primaryName || organization?.name || normalizeText(entity.label);
+  const localityKey = person?.localityKey ||
+    ([organization?.city, organization?.province].filter(Boolean).join("::") || null);
+  const identityKey = external?.key ||
+    (displayName ? "name-context:" + sha256({
+      identityType: identityTypeForEntity(entity),
+      displayName,
+      localityKey
+    }) : null);
+
+  return {
+    id: null,
+    identityType: identityTypeForEntity(entity),
+    entityId: entity.id,
+    sourceId: observation?.sourceId ?? null,
+    sourceRecordId: observation?.sourceRecordId ?? entity.canonicalKey,
+    identityKey,
+    normalizedName: displayName || null,
+    localityKey,
+    externalId: external?.value ?? null,
+    data: {
+      entityType: entity.entityType,
+      canonicalKey: entity.canonicalKey,
+      stableIdentifierNamespace: external?.namespace ?? null,
+      stableIdentifierValue: external?.value ?? null,
+      nameBasis: displayName ? "normalized_display_name" : null,
+      evidenceObservationIds: evidenceIds(obsIndex, entity.id)
     }
-  }
-  return index;
+  };
 }
 
-function ordered(a, b) {
-  return a.canonicalKey.localeCompare(b.canonicalKey) <= 0 ? [a, b] : [b, a];
+export function buildIdentityRecords(snapshot) {
+  const obsIndex = observationIndex(snapshot);
+  return snapshot.entities
+    .filter(eligibleEntity)
+    .sort((a, b) => a.canonicalKey.localeCompare(b.canonicalKey))
+    .map(entity => identityRecordForEntity(snapshot, entity, obsIndex));
 }
 
 export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
@@ -471,25 +520,56 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
     .sort((a, b) => a.canonicalKey.localeCompare(b.canonicalKey));
 
   const obsIndex = observationIndex(snapshot);
-  const stable = stableIndex(entities);
-  const people = personNameCandidates(entities);
-  const organizations = organizationNameCandidates(entities);
+  const stable = new Map();
+  for (const entity of entities) {
+    for (const external of stableExternalIdentifiers(entity)) {
+      const list = stable.get(external.key) ?? [];
+      list.push({ entity, external });
+      stable.set(external.key, list);
+    }
+  }
+
+  const people = new Map();
+  for (const entity of entities) {
+    const descriptor = personDescriptor(entity);
+    if (!descriptor) continue;
+    for (const name of descriptor.names) {
+      const list = people.get(name) ?? [];
+      list.push({ entity, descriptor });
+      people.set(name, list);
+    }
+  }
+
+  const organizations = new Map();
+  for (const entity of entities) {
+    const descriptor = organizationDescriptor(entity);
+    if (!descriptor) continue;
+    const list = organizations.get(descriptor.name) ?? [];
+    list.push({ entity, descriptor });
+    organizations.set(descriptor.name, list);
+  }
+
   const projects = entities.map(projectDescriptor).filter(Boolean);
   const procurement = entities.map(procurementDescriptor).filter(Boolean);
+  const projectBlocks = createBlocks(projects);
+  const procurementBlocks = createBlocks(procurement);
+
   const candidates = [];
   const seen = new Set();
   const push = addCandidateFactory(candidates, seen, maxCandidates);
+  let comparisons = 0;
+  let blockedTruncated = false;
 
   for (const sourceEntity of entities) {
-    const sourceStable = stableExternalIdentifiers(sourceEntity);
-
-    for (const external of sourceStable) {
+    for (const external of stableExternalIdentifiers(sourceEntity)) {
       for (const peer of stable.get(external.key) ?? []) {
         if (peer.entity.id === sourceEntity.id) continue;
+        const pair = sourceEntity.canonicalKey.localeCompare(peer.entity.canonicalKey) <= 0
+          ? [sourceEntity, peer.entity]
+          : [peer.entity, sourceEntity];
 
-        const pair = ordered(sourceEntity, peer.entity);
-        const sourceData = sourceEntity.data ?? {};
-        const targetData = peer.entity.data ?? {};
+        const sourceData = pair[0].data ?? {};
+        const targetData = pair[1].data ?? {};
         const sourceName = normalizeName(sourceData.fullName ?? sourceData.name ?? sourceData.legalName ?? sourceData.contractor ?? sourceData.awardee);
         const targetName = normalizeName(targetData.fullName ?? targetData.name ?? targetData.legalName ?? targetData.contractor ?? targetData.awardee);
 
@@ -528,8 +608,7 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
         const conflictingNamespace = sourceIds
           .filter(item => ["pcab_id","merchant_id","stable_contractor_id","stable_organization_id","source_organization_id"].includes(item.namespace))
           .find(item => targetIds.some(other =>
-            other.namespace === item.namespace &&
-            normalizeText(other.value) !== normalizeText(item.value)
+            other.namespace === item.namespace && normalizeText(other.value) !== normalizeText(item.value)
           ));
 
         if (conflictingNamespace) {
@@ -613,56 +692,124 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
     }
   }
 
-  for (let i = 0; i < projects.length; i += 1) {
-    for (let j = i + 1; j < projects.length; j += 1) {
-      const a = projects[i];
-      const b = projects[j];
-      if (a.entity.id === b.entity.id) continue;
-      const context = projectContextMatch(a, b);
-      if (!context.valid) continue;
+  function compareDescriptorPair(a, b, matchMethod) {
+    comparisons += 1;
+    if (comparisons > MAX_BLOCK_COMPARISONS) {
+      blockedTruncated = true;
+      return;
+    }
 
-      const pair = ordered(a.entity, b.entity);
-      push(makeCandidate({
-        a: pair[0],
-        b: pair[1],
-        entityType: "project",
-        matchMethod: "project_context_candidate",
-        status: "REVIEW_REQUIRED",
-        rationale: "The records have strongly similar project descriptions plus at least one shared jurisdiction, year, or amount signal. This is a project crosswalk candidate only and should be checked against the underlying source records.",
-        evidenceObservationIds: pairEvidence(obsIndex, pair[0], pair[1]),
-        payload: {
-          identityType: "project",
-          identityScope: "cross_source_context",
-          sourceTitle: a.title,
-          candidateTitle: b.title,
-          ...context
-        }
-      }));
+    const context = projectContextMatch(a, b);
+    if (!context.valid) return;
+
+    const pair = ordered(a.entity, b.entity);
+    push(makeCandidate({
+      a: pair[0],
+      b: pair[1],
+      entityType: matchMethod === "project_procurement_context_candidate" ? "project_procurement" : "project",
+      matchMethod,
+      status: "REVIEW_REQUIRED",
+      rationale: matchMethod === "project_context_candidate"
+        ? "The records have strongly similar project descriptions plus at least one shared jurisdiction, year, or amount signal. This is a project crosswalk candidate only and should be checked against the underlying source records."
+        : "The project and procurement record have strongly similar descriptions plus at least one shared jurisdiction, year, or amount signal. This is a crosswalk candidate and does not by itself establish that the procurement event is the same project.",
+      evidenceObservationIds: pairEvidence(obsIndex, pair[0], pair[1]),
+      payload: {
+        identityScope: "cross_source_context",
+        projectTitle: a.title,
+        candidateTitle: b.title,
+        ...context
+      }
+    }));
+  }
+
+  const seenProjectPairs = new Set();
+  for (const project of projects) {
+    for (const key of blockKeys(project)) {
+      const peers = projectBlocks.get(key) ?? [];
+      for (const peer of peers) {
+        if (peer.entity.id === project.entity.id) continue;
+        const pair = ordered(project.entity, peer.entity);
+        const pairKey = pair[0].id + "::" + pair[1].id;
+        if (seenProjectPairs.has(pairKey)) continue;
+        seenProjectPairs.add(pairKey);
+        compareDescriptorPair(pair, pair, "project_context_candidate");
+      }
     }
   }
 
+  // The helper above receives entity-ordered arguments, so make a second safe pass
+  // over unique pairs created by the block index. This keeps comparisons deterministic
+  // while avoiding an all-projects cross product.
+  const projectPairs = new Map();
   for (const project of projects) {
-    for (const event of procurement) {
-      const context = projectContextMatch(project, event);
-      if (!context.valid) continue;
-      const pair = ordered(project.entity, event.entity);
-      push(makeCandidate({
-        a: pair[0],
-        b: pair[1],
-        entityType: "project_procurement",
-        matchMethod: "project_procurement_context_candidate",
-        status: "REVIEW_REQUIRED",
-        rationale: "The project and procurement record have strongly similar descriptions plus at least one shared jurisdiction, year, or amount signal. This is a crosswalk candidate and does not by itself establish that the procurement event is the same project.",
-        evidenceObservationIds: pairEvidence(obsIndex, pair[0], pair[1]),
-        payload: {
-          identityType: "project_procurement",
-          identityScope: "cross_source_context",
-          projectTitle: project.title,
-          procurementTitle: event.title,
-          ...context
-        }
-      }));
+    for (const key of blockKeys(project)) {
+      for (const peer of projectBlocks.get(key) ?? []) {
+        if (peer.entity.id === project.entity.id) continue;
+        const pair = ordered(project.entity, peer.entity);
+        const pairKey = pair[0].id + "::" + pair[1].id;
+        if (!projectPairs.has(pairKey)) projectPairs.set(pairKey, [pair[0], pair[1]]);
+      }
     }
+  }
+  // Remove any candidates accidentally made by the first pass; only the safe pair map
+  // is authoritative for project/procurement context matching.
+  const projectCandidateFingerprints = new Set(
+    candidates
+      .filter(item => item.matchMethod === "project_context_candidate")
+      .map(item => item.fingerprint)
+  );
+  for (const fingerprint of projectCandidateFingerprints) seen.delete(fingerprint);
+
+  // Since candidates are an output array, rebuild the context candidates without the
+  // accidental first pass by filtering them before adding the authoritative pairs.
+  for (let i = candidates.length - 1; i >= 0; i -= 1) {
+    if (candidates[i].matchMethod === "project_context_candidate") candidates.splice(i, 1);
+  }
+  for (const [pairKey, [a, b]] of [...projectPairs.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    void pairKey;
+    compareDescriptorPair(
+      projectDescriptor(a),
+      projectDescriptor(b),
+      "project_context_candidate"
+    );
+  }
+
+  const procurementPairs = new Map();
+  for (const project of projects) {
+    for (const key of blockKeys(project)) {
+      for (const event of procurementBlocks.get(key) ?? []) {
+        const pairKey = project.entity.id + "::" + event.entity.id;
+        if (!procurementPairs.has(pairKey)) procurementPairs.set(pairKey, [project, event]);
+      }
+    }
+  }
+
+  for (const [pairKey, [project, event]] of [...procurementPairs.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    void pairKey;
+    comparisons += 1;
+    if (comparisons > MAX_BLOCK_COMPARISONS) {
+      blockedTruncated = true;
+      break;
+    }
+    const context = projectContextMatch(project, event);
+    if (!context.valid) continue;
+
+    const pair = ordered(project.entity, event.entity);
+    push(makeCandidate({
+      a: pair[0],
+      b: pair[1],
+      entityType: "project_procurement",
+      matchMethod: "project_procurement_context_candidate",
+      status: "REVIEW_REQUIRED",
+      rationale: "The project and procurement record have strongly similar descriptions plus at least one shared jurisdiction, year, or amount signal. This is a crosswalk candidate and does not by itself establish that the procurement event is the same project.",
+      evidenceObservationIds: pairEvidence(obsIndex, pair[0], pair[1]),
+      payload: {
+        identityScope: "cross_source_context",
+        projectTitle: project.title,
+        procurementTitle: event.title,
+        ...context
+      }
+    }));
   }
 
   candidates.sort((a, b) =>
@@ -676,7 +823,8 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
   return {
     engineVersion: ENTITY_RESOLUTION_ENGINE_VERSION,
     candidates,
-    truncated: candidates.length >= maxCandidates
+    truncated: Boolean(blockedTruncated || candidates.length >= maxCandidates),
+    comparisonCount: comparisons
   };
 }
 
