@@ -142,10 +142,53 @@ export class MemoryStore {
   }
 
   async getCorrelationSnapshot() {
+    const baseEntities = [...this.entities.values()].filter(entity =>
+      entity.entityType === "project" ||
+      (
+        entity.entityType === "election_result" &&
+        (
+          entity.data?.dataset === "NLE_Winners_2004-2025" ||
+          entity.data?.dataset == null
+        )
+      )
+    );
+
+    const projectContractIds = new Set(
+      baseEntities
+        .filter(entity => entity.entityType === "project")
+        .map(entity => String(entity.data?.contractId ?? "").trim().toUpperCase())
+        .filter(Boolean)
+    );
+
+    const procurementEntities = [...this.entities.values()].filter(entity =>
+      entity.entityType === "procurement_event" &&
+      projectContractIds.has(String(entity.data?.referenceNumber ?? "").trim().toUpperCase())
+    );
+
+    const selectedIds = new Set([
+      ...baseEntities.map(entity => entity.id),
+      ...procurementEntities.map(entity => entity.id)
+    ]);
+
+    const selectedEdges = [...this.edges.values()].filter(edge =>
+      selectedIds.has(edge.fromEntityId) || selectedIds.has(edge.toEntityId)
+    );
+
+    const relatedEntityIds = new Set([
+      ...selectedEdges.flatMap(edge => [edge.fromEntityId, edge.toEntityId]),
+      ...selectedIds
+    ]);
+
+    const relatedEntities = [...this.entities.values()].filter(entity =>
+      relatedEntityIds.has(entity.id)
+    );
+
     return {
-      entities: [...this.entities.values()].map(row => ({ ...row })),
-      observations: [...this.observations.values()].map(row => ({ ...row })),
-      edges: [...this.edges.values()].map(row => ({ ...row }))
+      entities: relatedEntities.map(row => ({ ...row })),
+      observations: [...this.observations.values()]
+        .filter(row => relatedEntityIds.has(row.entityId))
+        .map(row => ({ ...row })),
+      edges: selectedEdges.map(row => ({ ...row }))
     };
   }
 
