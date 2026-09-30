@@ -54,6 +54,7 @@ jobs:
           test -f src/entity-resolution/engine.js
           test -f src/entity-resolution/rules.js
           test -f scripts/test-entity-resolution.mjs
+          test -f scripts/test-ui-syntax.mjs
           test -f api/evidence.js
           test -f api/entity-resolution.js
           test -f src/correlation/engine.js
@@ -88,6 +89,7 @@ jobs:
           node --check api/evidence.js
           node --check api/entity-resolution.js
           node --check scripts/test-entity-resolution.mjs
+          node --check scripts/test-ui-syntax.mjs
           node --check src/correlation/rules.js
           node --check src/correlation/engine.js
           node --check src/db/postgres.js
@@ -108,8 +110,12 @@ jobs:
           python3 -m json.tool data/schema.json >/dev/null
           python3 -m json.tool data/seed.json >/dev/null
 
-      - name: Test ingestion, adapters, entity resolution, and correlation engine
+      - name: Test ingestion, adapters, entity resolution, correlation engine, and UI
         run: npm test
+        env:
+          NODE_OPTIONS: --unhandled-rejections=strict
+      - name: Test UI syntax
+        run: node scripts/test-ui-syntax.mjs
         env:
           NODE_OPTIONS: --unhandled-rejections=strict
 
