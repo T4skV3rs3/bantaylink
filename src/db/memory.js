@@ -170,6 +170,14 @@ export class MemoryStore {
     return run;
   }
 
+  async insertEntityResolutionIdentityRecord(runId, identity) {
+    if (!this.entityResolutionIdentityRecords) this.entityResolutionIdentityRecords = new Map();
+    const id = identity.id || runId + ":" + identity.entityId;
+    const row = { ...identity, id, entityResolutionRunId: runId };
+    this.entityResolutionIdentityRecords.set(id, row);
+    return row;
+  }
+
   async insertEntityResolutionCandidate(runId, candidate) {
     if (!this.entityResolutionCandidates) this.entityResolutionCandidates = new Map();
     const id = candidate.id || runId + ":" + candidate.fingerprint;
