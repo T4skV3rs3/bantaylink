@@ -37,6 +37,7 @@ export function runEntityResolution({ snapshot, maxCandidates } = {}) {
       reviewRequiredCount: reviewRequired,
       conflictCount: conflicts,
       clusterCount: clusters.length,
+      truncated: Boolean(result.truncated),
       errors: []
     },
     candidates: result.candidates,
@@ -103,6 +104,7 @@ export async function executeEntityResolutionRun({ store, maxCandidates } = {}) 
       reviewRequiredCount: result.run.reviewRequiredCount,
       conflictCount: result.run.conflictCount,
       clusterCount: clusters.length,
+      truncated: Boolean(result.truncated),
       errors: []
     });
   } catch (error) {
