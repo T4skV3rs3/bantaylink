@@ -314,6 +314,30 @@ CREATE INDEX IF NOT EXISTS idx_entity_resolution_assertions_canonical
 CREATE INDEX IF NOT EXISTS idx_entity_resolution_assertions_type
   ON entity_resolution_assertions(assertion_type);
 
+CREATE TABLE IF NOT EXISTS entity_resolution_clusters (
+  id TEXT PRIMARY KEY,
+  entity_resolution_run_id TEXT NOT NULL REFERENCES entity_resolution_runs(id) ON DELETE CASCADE,
+  entity_type TEXT NOT NULL,
+  cluster_key TEXT NOT NULL,
+  representative_entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE RESTRICT,
+  member_entity_ids TEXT[] NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('AUTO_CONFIRMED','REVIEW_REQUIRED')),
+  basis JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(entity_resolution_run_id, cluster_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_resolution_clusters_run
+  ON entity_resolution_clusters(entity_resolution_run_id);
+
+CREATE INDEX IF NOT EXISTS idx_entity_resolution_clusters_representative
+  ON entity_resolution_clusters(representative_entity_id);
+
+CREATE INDEX IF NOT EXISTS idx_entity_resolution_clusters_type
+  ON entity_resolution_clusters(entity_type);
+
+
+
 CREATE OR REPLACE FUNCTION bantaylink_prevent_resolution_assertion_mutation()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -328,116 +352,3 @@ CREATE TRIGGER entity_resolution_assertions_append_only
 BEFORE UPDATE OR DELETE ON entity_resolution_assertions
 FOR EACH ROW EXECUTE FUNCTION bantaylink_prevent_resolution_assertion_mutation();
 
-
--- Entity resolution v1: canonical identities are derived separately from
--- source-backed entities so source evidence is never overwritten or rewritten.
-CREATE TABLE IF NOT EXISTS resolution_runs (
-  id TEXT PRIMARY KEY,
-  engine_version TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('running','completed','failed')),
-  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  completed_at TIMESTAMPTZ,
-  identity_record_count INTEGER NOT NULL DEFAULT 0,
-  candidate_count INTEGER NOT NULL DEFAULT 0,
-  verified_identifier_count INTEGER NOT NULL DEFAULT 0,
-  errors JSONB NOT NULL DEFAULT '[]'::jsonb
-);
-
-CREATE TABLE IF NOT EXISTS resolved_entities (
-  id TEXT PRIMARY KEY,
-  entity_type TEXT NOT NULL CHECK (entity_type IN ('person','organization')),
-  canonical_key TEXT NOT NULL UNIQUE,
-  label TEXT,
-  resolution_status TEXT NOT NULL,
-  data JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_resolved_entities_type
-  ON resolved_entities(entity_type);
-
-CREATE TABLE IF NOT EXISTS resolution_identity_records (
-  id TEXT PRIMARY KEY,
-  resolution_run_id TEXT NOT NULL REFERENCES resolution_runs(id) ON DELETE CASCADE,
-  identity_type TEXT NOT NULL CHECK (identity_type IN ('person','organization')),
-  entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE RESTRICT,
-  source_id TEXT REFERENCES sources(id),
-  source_record_id TEXT NOT NULL,
-  identity_key TEXT NOT NULL,
-  normalized_name TEXT NOT NULL,
-  locality_key TEXT,
-  external_id TEXT,
-  data JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE(resolution_run_id, identity_type, source_record_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_resolution_identity_key
-  ON resolution_identity_records(identity_type, identity_key);
-
-CREATE INDEX IF NOT EXISTS idx_resolution_identity_entity
-  ON resolution_identity_records(entity_id);
-
-CREATE TABLE IF NOT EXISTS resolution_candidates (
-  id TEXT PRIMARY KEY,
-  resolution_run_id TEXT NOT NULL REFERENCES resolution_runs(id) ON DELETE CASCADE,
-  rule_id TEXT NOT NULL,
-  status TEXT NOT NULL,
-  basis TEXT NOT NULL,
-  fingerprint TEXT NOT NULL,
-  identity_record_ids TEXT[] NOT NULL,
-  resolved_entity_ids TEXT[] NOT NULL DEFAULT '{}'::text[],
-  evidence_observation_ids TEXT[] NOT NULL DEFAULT '{}'::text[],
-  payload JSONB NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE(resolution_run_id, fingerprint)
-);
-
-CREATE INDEX IF NOT EXISTS idx_resolution_candidates_run
-  ON resolution_candidates(resolution_run_id);
-
-CREATE INDEX IF NOT EXISTS idx_resolution_candidates_status
-  ON resolution_candidates(status);
-
-CREATE TABLE IF NOT EXISTS relationship_assertions (
-  id TEXT PRIMARY KEY,
-  relationship_type TEXT NOT NULL,
-  from_resolved_entity_id TEXT NOT NULL REFERENCES resolved_entities(id) ON DELETE RESTRICT,
-  to_resolved_entity_id TEXT NOT NULL REFERENCES resolved_entities(id) ON DELETE RESTRICT,
-  status TEXT NOT NULL,
-  source_id TEXT REFERENCES sources(id),
-  resolution_run_id TEXT REFERENCES resolution_runs(id) ON DELETE SET NULL,
-  evidence_observation_ids TEXT[] NOT NULL DEFAULT '{}'::text[],
-  evidence_edge_ids TEXT[] NOT NULL DEFAULT '{}'::text[],
-  data JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_relationship_assertions_from
-  ON relationship_assertions(from_resolved_entity_id);
-
-CREATE INDEX IF NOT EXISTS idx_relationship_assertions_to
-  ON relationship_assertions(to_resolved_entity_id);
-
-CREATE TABLE IF NOT EXISTS office_tenure_assertions (
-  id TEXT PRIMARY KEY,
-  resolved_person_id TEXT NOT NULL REFERENCES resolved_entities(id) ON DELETE RESTRICT,
-  office_title TEXT NOT NULL,
-  jurisdiction_type TEXT NOT NULL,
-  jurisdiction TEXT,
-  start_date DATE,
-  end_date DATE,
-  status TEXT NOT NULL,
-  source_id TEXT REFERENCES sources(id),
-  resolution_run_id TEXT REFERENCES resolution_runs(id) ON DELETE SET NULL,
-  evidence_observation_ids TEXT[] NOT NULL DEFAULT '{}'::text[],
-  data JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_office_tenure_person
-  ON office_tenure_assertions(resolved_person_id);
-
-CREATE INDEX IF NOT EXISTS idx_office_tenure_dates
-  ON office_tenure_assertions(start_date, end_date);
