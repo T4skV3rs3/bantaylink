@@ -121,6 +121,29 @@ const sourceB = entity("s2", "source", "doc:b", {
   url: "https://example.invalid/b"
 });
 
+const sourceC = entity("s3", "source", "coa-doc:c", {
+  documentId: "DOC-123",
+  url: "https://example.invalid/c"
+});
+
+const orgA = entity("o1", "organization", "org:a", {
+  legalName: "Test Municipal Engineering Office"
+});
+
+const orgB = entity("o2", "organization", "org:b", {
+  legalName: "TEST MUNICIPAL ENGINEERING OFFICE"
+});
+
+const orgConflictA = entity("o3", "organization", "org:c", {
+  legalName: "Test Planning Office",
+  stableOrganizationId: "ORG-1"
+});
+
+const orgConflictB = entity("o4", "organization", "org:d", {
+  legalName: "TEST PLANNING OFFICE",
+  stableOrganizationId: "ORG-2"
+});
+
 const snapshot = {
   entities: [
     electionA,
@@ -136,7 +159,12 @@ const snapshot = {
     contractorNameOnlyB,
     project,
     sourceA,
-    sourceB
+    sourceB,
+    sourceC,
+    orgA,
+    orgB,
+    orgConflictA,
+    orgConflictB
   ],
   observations: [
     observation("oe1", "e1", electionA.data, "election_result"),
@@ -152,7 +180,12 @@ const snapshot = {
     observation("oc6", "c6", contractorNameOnlyB.data, "contractor"),
     observation("op1", "p1", project.data, "project"),
     observation("os1", "s1", sourceA.data, "official_document"),
-    observation("os2", "s2", sourceB.data, "official_document")
+    observation("os2", "s2", sourceB.data, "official_document"),
+    observation("os3", "s3", sourceC.data, "official_document"),
+    observation("oo1", "o1", orgA.data, "organization"),
+    observation("oo2", "o2", orgB.data, "organization"),
+    observation("oo3", "o3", orgConflictA.data, "organization"),
+    observation("oo4", "o4", orgConflictB.data, "organization")
   ],
   edges: []
 };
@@ -161,7 +194,7 @@ const first = runEntityResolution({ snapshot });
 const second = runEntityResolution({ snapshot });
 
 assert.equal(first.run.engineVersion, ENTITY_RESOLUTION_ENGINE_VERSION);
-assert.equal(ENTITY_RESOLUTION_ENGINE_VERSION, "1.1.0");
+assert.equal(ENTITY_RESOLUTION_ENGINE_VERSION, "1.2.0");
 
 assert.deepEqual(
   first.candidates.map(item => item.fingerprint).sort(),
@@ -231,6 +264,28 @@ const document = first.candidates.find(item =>
 );
 assert(document);
 assert.equal(document.status, "AUTO_CONFIRMED");
+assert(!first.candidates.some(item =>
+  item.matchMethod === "document_id" &&
+  new Set([item.sourceEntityId, item.candidateEntityId]).has("s1") &&
+  new Set([item.sourceEntityId, item.candidateEntityId]).has("s3")
+), "Document identifiers must remain scoped to their source namespace.");
+
+const orgNameCandidate = first.candidates.find(item =>
+  item.matchMethod === "normalized_organization_name" &&
+  item.entityType === "organization" &&
+  item.sourceEntityId === "o1" &&
+  item.candidateEntityId === "o2"
+);
+assert(orgNameCandidate);
+assert.equal(orgNameCandidate.status, "REVIEW_REQUIRED");
+
+const orgConflict = first.candidates.find(item =>
+  item.matchMethod === "organization_name_conflicting_identifier" &&
+  new Set([item.sourceEntityId, item.candidateEntityId]).has("o3") &&
+  new Set([item.sourceEntityId, item.candidateEntityId]).has("o4")
+);
+assert(orgConflict);
+assert.equal(orgConflict.status, "CONFLICT");
 
 assert(first.clusters.length >= 1);
 const contractorCluster = first.clusters.find(cluster =>
