@@ -86,8 +86,7 @@ function normalizeProcurementRecord(record, contentHash, datasetUrl) {
 }
 
 export function normalizePhilgepsRecord(record, contentHash, datasetUrl = null) {
-  const procurement = normalizeProcurementRecord(record, contentHash, datasetUrl);
-  const event = procurement.entity;
+  const event = normalizeProcurementRecord(record, contentHash, datasetUrl);
   const data = event.data;
   const entities = [event];
   const edges = [];
