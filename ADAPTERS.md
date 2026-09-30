@@ -60,7 +60,7 @@ The adapter targets the documented SIDLAN I-BUILD dataset endpoint. It supports 
 - `SIDLAN_PROVINCE` (default `all`)
 - `SIDLAN_GROUP_STATUS` (default `all`)
 
-It requires `SIDLAN_API_KEY` server-side. The first cut uses JSON output because it is directly machine-readable; it does not attempt to obtain, expose, or bypass API keys.
+It requires `SIDLAN_API_KEY` server-side. JSON and streamed CSV outputs are supported. CSV is parsed incrementally so bounded runs do not require loading the entire dataset into memory. The API key is never emitted into the stored retrieval URL; credential-like query parameters are redacted.
 
 ## COA eLibrary
 
