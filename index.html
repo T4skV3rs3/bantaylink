@@ -137,10 +137,10 @@ function render(){
   else if(state.tab==="correlations")app.innerHTML=correlationsView();
   else app.innerHTML=evidenceView();
 
-  document.querySelectorAll("[data-project]").forEach(el=>el.onclick=async()=>{state.selectedProject=el.dataset.project;await loadEvidence({entityId:el.dataset.project});state.tab="evidence";render()});
+  document.querySelectorAll("[data-project]").forEach(el=>el.onclick=async()=>{state.selectedProject=el.dataset.project;await loadEvidence({canonicalKey:"dpwh-contract:"+el.dataset.project});state.tab="evidence";render()});
   document.querySelectorAll("[data-finding]").forEach(el=>el.onclick=()=>{state.selectedFinding=el.dataset.finding;state.tab="correlations";render()});
   document.querySelectorAll("[data-open-finding]").forEach(el=>el.onclick=async()=>{await loadEvidence({findingId:el.dataset.openFinding});state.tab="evidence";render()});
-  document.querySelectorAll("[data-candidate]").forEach(el=>el.onclick=async()=>{const c=(state.resolution?.candidates||[]).find(x=>x.id===el.dataset.candidate);if(c&&c.evidenceObservationIds?.length)await loadEvidence({findingId:c.evidenceObservationIds[0]});state.tab="evidence";render()});
+  document.querySelectorAll("[data-candidate]").forEach(el=>el.onclick=async()=>{const c=(state.resolution?.candidates||[]).find(x=>x.id===el.dataset.candidate);if(c&&c.evidenceObservationIds?.length)await loadEvidence({observationId:c.evidenceObservationIds[0]});state.tab="evidence";render()});
 }
 
 async function loadJson(url){
