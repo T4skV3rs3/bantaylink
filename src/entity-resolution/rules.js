@@ -184,6 +184,36 @@ function buildPersonIndexes(entities) {
   return { byNameLocality, byName };
 }
 
+function contractorDescriptor(entity) {
+  if (entity.entityType !== "contractor") return null;
+  const data = entity.data ?? {};
+  const name = normalizeName(data.legalName ?? data.name ?? data.contractor);
+  if (!name) return null;
+  return {
+    name,
+    pcabId: clean(data.pcabId),
+    source: clean(data.sourceKey)
+  };
+}
+
+function buildContractorNameIndex(entities) {
+  const index = new Map();
+  for (const entity of entities) {
+    const descriptor = contractorDescriptor(entity);
+    if (!descriptor) continue;
+    const list = index.get(descriptor.name) ?? [];
+    list.push({ entity, descriptor });
+    index.set(descriptor.name, list);
+  }
+  return index;
+}
+
+function orderedPair(sourceEntity, targetEntity) {
+  return sourceEntity.canonicalKey.localeCompare(targetEntity.canonicalKey) < 0
+    ? [sourceEntity, targetEntity]
+    : [targetEntity, sourceEntity];
+}
+
 function compatiblePersonContext(a, b) {
   const sexCompatible = !a.sex || !b.sex || a.sex === b.sex;
   const positionCompatible = !a.position || !b.position || a.position === b.position;
@@ -215,6 +245,7 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
 
   const stableIndex = buildStableIndexes(entities);
   const { byNameLocality, byName } = buildPersonIndexes(entities);
+  const contractorsByName = buildContractorNameIndex(entities);
 
   const candidates = [];
   const seenPairs = new Set();
@@ -245,12 +276,55 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
           rationale: conflict
             ? "Two records expose conflicting stable contractor identifiers and must not be merged."
             : "The source records expose the same typed stable external identifier; this is an identity match at the identifier level.",
-          evidenceObservationIds: makeEvidence(observationIndex, sourceEntity.id, targetEntity.id),
+          evidenceObservationIds: makeEvidence(observationIndex, pair[0].id, pair[1].id),
           payload: {
             namespace: external.namespace,
             value: external.value
           }
         }));
+      }
+    }
+
+    const contractor = contractorDescriptor(sourceEntity);
+    if (contractor) {
+      const peers = contractorsByName.get(contractor.name) ?? [];
+      for (const { entity: targetEntity, descriptor: targetDescriptor } of peers) {
+        if (targetEntity.id === sourceEntity.id) continue;
+        const pcabConflict = contractor.pcabId && targetDescriptor.pcabId &&
+          contractor.pcabId !== targetDescriptor.pcabId;
+        if (!pcabConflict && !(contractor.pcabId || targetDescriptor.pcabId)) {
+          const pair = orderedPair(sourceEntity, targetEntity);
+          if (pair[0].id !== sourceEntity.id) continue;
+          push(candidate({
+            sourceEntity: pair[0],
+            targetEntity: pair[1],
+            entityType: "contractor",
+            method: "normalized_contractor_name",
+            status: "REVIEW_REQUIRED",
+            rationale: "The contractor names normalize to the same value, but no shared stable identifier was provided. This is a review candidate only.",
+            evidenceObservationIds: makeEvidence(observationIndex, pair[0].id, pair[1].id),
+            payload: {
+              normalizedName: contractor.name
+            }
+          }));
+        } else if (pcabConflict) {
+          const pair = orderedPair(sourceEntity, targetEntity);
+          if (pair[0].id !== sourceEntity.id) continue;
+          push(candidate({
+            sourceEntity: pair[0],
+            targetEntity: pair[1],
+            entityType: "contractor",
+            method: "contractor_name_conflicting_pcab",
+            status: "CONFLICT",
+            rationale: "The records share a normalized contractor name but expose different PCAB identifiers. They must not be merged automatically.",
+            evidenceObservationIds: makeEvidence(observationIndex, pair[0].id, pair[1].id),
+            payload: {
+              normalizedName: contractor.name,
+              sourcePcabId: contractor.pcabId || null,
+              candidatePcabId: targetDescriptor.pcabId || null
+            }
+          }));
+        }
       }
     }
 
@@ -269,9 +343,12 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
         if (targetEntity.id === sourceEntity.id) continue;
         if (!compatiblePersonContext(descriptor, targetDescriptor)) continue;
 
+        const pair = orderedPair(sourceEntity, targetEntity);
+        if (pair[0].id !== sourceEntity.id) continue;
+
         push(candidate({
-          sourceEntity,
-          targetEntity,
+          sourceEntity: pair[0],
+          targetEntity: pair[1],
           entityType: "person",
           method: "name_locality_candidate",
           status: "REVIEW_REQUIRED",
@@ -297,9 +374,12 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
           continue;
         }
 
+        const pair = orderedPair(sourceEntity, targetEntity);
+        if (pair[0].id !== sourceEntity.id) continue;
+
         push(candidate({
-          sourceEntity,
-          targetEntity,
+          sourceEntity: pair[0],
+          targetEntity: pair[1],
           entityType: "person",
           method: "name_candidate",
           status: "REVIEW_REQUIRED",
