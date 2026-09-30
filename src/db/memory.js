@@ -161,6 +161,8 @@ export class MemoryStore {
       autoConfirmedCount: 0,
       reviewRequiredCount: 0,
       conflictCount: 0,
+      clusterCount: 0,
+      truncated: false,
       errors: []
     };
     if (!this.entityResolutionRuns) this.entityResolutionRuns = new Map();
@@ -173,6 +175,14 @@ export class MemoryStore {
     const id = candidate.id || runId + ":" + candidate.fingerprint;
     const row = { ...candidate, id, entityResolutionRunId: runId };
     this.entityResolutionCandidates.set(id, row);
+    return row;
+  }
+
+  async insertEntityResolutionCluster(runId, cluster) {
+    if (!this.entityResolutionClusters) this.entityResolutionClusters = new Map();
+    const id = cluster.id || runId + ":" + cluster.clusterKey;
+    const row = { ...cluster, id, entityResolutionRunId: runId };
+    this.entityResolutionClusters.set(id, row);
     return row;
   }
 
