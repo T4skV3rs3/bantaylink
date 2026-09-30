@@ -154,7 +154,11 @@ function stableExternalId(entity) {
     const id = clean(data.documentId ?? data.trackingNumber ?? data.url);
     if (id) {
       return {
-        namespace: data.documentId ? "document_id" : "source_reference",
+        namespace: data.documentId
+          ? "document_id"
+          : data.trackingNumber
+            ? "tracking_number"
+            : "source_reference",
         value: id,
         identityScope: "entity_identity"
       };
@@ -238,6 +242,7 @@ function makeCandidate({
   status,
   rationale,
   evidenceObservationIds,
+  evidenceEdgeIds = [],
   payload = {}
 }) {
   const ordered = a.canonicalKey.localeCompare(b.canonicalKey) <= 0 ? [a, b] : [b, a];
@@ -252,7 +257,7 @@ function makeCandidate({
     status,
     rationale,
     evidenceObservationIds: [...new Set(evidenceObservationIds)].sort(),
-    evidenceEdgeIds: [],
+    evidenceEdgeIds: [...new Set(evidenceEdgeIds)].sort(),
     payload
   };
 }
