@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { runEntityResolution, ENTITY_RESOLUTION_ENGINE_VERSION } from "../src/entity-resolution/engine.js";
+import { runEntityResolution, executeEntityResolutionRun, ENTITY_RESOLUTION_ENGINE_VERSION } from "../src/entity-resolution/engine.js";
+import { MemoryStore } from "../src/db/memory.js";
 
 function entity(id, entityType, canonicalKey, data = {}, label = canonicalKey) {
   return { id, entityType, canonicalKey, data, label };
@@ -135,5 +136,16 @@ const document = first.candidates.find(item =>
 );
 assert(document);
 assert.equal(document.status, "AUTO_CONFIRMED");
+
+const store = new MemoryStore();
+for (const item of snapshot.entities) await store.upsertEntity(item);
+for (const item of snapshot.observations) await store.insertObservation(item);
+const persistedRun = await executeEntityResolutionRun({ store, maxCandidates: 100 });
+if (persistedRun.status !== "completed") throw new Error("Persisted entity-resolution run did not complete.");
+if (persistedRun.candidateCount !== first.candidates.length) throw new Error("Persisted candidate count mismatch.");
+if (store.entityResolutionCandidates.size !== first.candidates.length) throw new Error("Persisted candidate count mismatch in store.");
+if (store.entityResolutionAssertions.length !== first.candidates.filter(item => item.status === "AUTO_CONFIRMED").length) {
+  throw new Error("Auto-confirmed assertions were not persisted.");
+}
 
 console.log("Entity-resolution engine v1.0 tests passed.");
