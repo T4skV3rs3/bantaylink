@@ -51,10 +51,17 @@ export default async function handler(req, res) {
          GROUP BY entity_id
        ) ed ON ed.entity_id=e.id
        LEFT JOIN (
-         SELECT source_entity_id AS entity_id, COUNT(*) AS review_count
-         FROM entity_resolution_candidates
-         WHERE status='REVIEW_REQUIRED'
-         GROUP BY source_entity_id
+         SELECT entity_id, COUNT(*) AS review_count
+         FROM (
+           SELECT source_entity_id AS entity_id
+           FROM entity_resolution_candidates
+           WHERE status='REVIEW_REQUIRED'
+           UNION ALL
+           SELECT candidate_entity_id AS entity_id
+           FROM entity_resolution_candidates
+           WHERE status='REVIEW_REQUIRED'
+         ) review_entities
+         GROUP BY entity_id
        ) rc ON rc.entity_id=e.id
        WHERE ($1::text = '' OR e.entity_type=$1)
          AND (
