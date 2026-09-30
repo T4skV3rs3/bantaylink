@@ -86,7 +86,7 @@ Identity clusters are derived topology over explicit identifier matches. They do
 
 ## Evidence UI and trace API
 
-`/api/entity/:id` (served by `api/entity.js`) exposes the selected entity, source-backed observations and edges, repeat-run occurrences, resolution candidates/assertions/clusters, and raw retrieval metadata. Raw payload content is returned only when `includeRaw=1` is supplied.
+`/api/entity?id=...` (served by `api/entity.js`) exposes the selected entity, source-backed observations and edges, repeat-run occurrences, resolution candidates/assertions/clusters, and raw retrieval metadata. Raw payload content is returned only when `includeRaw=1` is supplied.
 
 `/api/evidence` accepts an entity ID, canonical key, correlation finding ID, resolution candidate ID, observation IDs, and/or edge IDs and returns the complete evidence bundle behind that selection. The UI presents the evidence chain rather than collapsing it into a single score.
 
