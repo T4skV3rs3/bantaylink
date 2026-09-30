@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { ENTITY_RESOLUTION_ENGINE_VERSION, resolveEntities } from "./rules.js";
+import {
+  ENTITY_RESOLUTION_ENGINE_VERSION,
+  resolveEntities,
+  buildAutoConfirmedClusters
+} from "./rules.js";
 
 export { ENTITY_RESOLUTION_ENGINE_VERSION };
 
@@ -10,6 +14,10 @@ function normalizeMaxCandidates(value) {
   return Math.max(Math.floor(number), 0);
 }
 
+function candidateByFingerprint(candidates) {
+  return new Map(candidates.map(item => [item.fingerprint, item]));
+}
+
 export function runEntityResolution({ snapshot, maxCandidates } = {}) {
   const result = resolveEntities(snapshot, {
     maxCandidates: normalizeMaxCandidates(maxCandidates) ?? 25000
@@ -18,6 +26,7 @@ export function runEntityResolution({ snapshot, maxCandidates } = {}) {
   const autoConfirmed = result.candidates.filter(item => item.status === "AUTO_CONFIRMED").length;
   const reviewRequired = result.candidates.filter(item => item.status === "REVIEW_REQUIRED").length;
   const conflicts = result.candidates.filter(item => item.status === "CONFLICT").length;
+  const clusters = buildAutoConfirmedClusters(result.candidates, snapshot.entities);
 
   return {
     run: {
@@ -31,9 +40,12 @@ export function runEntityResolution({ snapshot, maxCandidates } = {}) {
       autoConfirmedCount: autoConfirmed,
       reviewRequiredCount: reviewRequired,
       conflictCount: conflicts,
+      clusterCount: clusters.length,
+      truncated: Boolean(result.truncated),
       errors: []
     },
-    candidates: result.candidates
+    candidates: result.candidates,
+    clusters
   };
 }
 
@@ -43,8 +55,9 @@ export async function executeEntityResolutionRun({ store, maxCandidates } = {}) 
       !store?.insertEntityResolutionCandidate ||
       !store?.insertEntityResolutionAssertion ||
       !store?.completeEntityResolutionRun ||
-      !store?.failEntityResolutionRun) {
-    throw new Error("Entity-resolution store is missing required run/candidate methods.");
+      !store?.failEntityResolutionRun ||
+      !store?.insertEntityResolutionCluster) {
+    throw new Error("Entity-resolution store is missing required run/cluster/assertion methods.");
   }
 
   const snapshot = await store.getEntityResolutionSnapshot();
@@ -60,20 +73,50 @@ export async function executeEntityResolutionRun({ store, maxCandidates } = {}) 
 
     for (const item of result.candidates) {
       await store.insertEntityResolutionCandidate(runId, item);
+    }
 
-      if (item.status === "AUTO_CONFIRMED") {
+    const candidatesByFingerprint = candidateByFingerprint(result.candidates);
+    for (const cluster of result.clusters) {
+      await store.insertEntityResolutionCluster(runId, cluster);
+
+      const evidenceObservationIds = [...new Set(
+        cluster.basis.identityGroupKeys.flatMap(groupKey =>
+          result.candidates
+            .filter(item => item.identityGroupKey === groupKey && item.status === "AUTO_CONFIRMED")
+            .flatMap(item => item.evidenceObservationIds)
+        )
+      )].sort();
+
+      for (const memberEntityId of cluster.memberEntityIds) {
+        if (memberEntityId === cluster.representativeEntityId) continue;
+
+        const supportingCandidates = result.candidates.filter(item =>
+          item.status === "AUTO_CONFIRMED" &&
+          item.entityType === cluster.entityType &&
+          cluster.memberEntityIds.includes(item.sourceEntityId) &&
+          cluster.memberEntityIds.includes(item.candidateEntityId) &&
+          (item.sourceEntityId === memberEntityId || item.candidateEntityId === memberEntityId)
+        );
+
+        const evidence = [...new Set(supportingCandidates.flatMap(item => item.evidenceObservationIds))].sort();
+        const assertionId = runId + ":assertion:" + cluster.clusterKey + ":" + memberEntityId;
+
         await store.insertEntityResolutionAssertion({
-          id: runId + ":assertion:" + item.fingerprint,
-          sourceEntityId: item.sourceEntityId,
-          canonicalEntityId: item.candidateEntityId,
+          id: assertionId,
+          sourceEntityId: memberEntityId,
+          canonicalEntityId: cluster.representativeEntityId,
           assertionType: "AUTO_CONFIRMED",
           resolutionRunId: runId,
-          evidenceObservationIds: item.evidenceObservationIds,
-          evidenceEdgeIds: item.evidenceEdgeIds,
+          identityGroupKey: cluster.clusterKey,
+          evidenceObservationIds: evidence.length ? evidence : evidenceObservationIds,
+          evidenceEdgeIds: [],
           basis: {
-            matchMethod: item.matchMethod,
-            rationale: item.rationale,
-            fingerprint: item.fingerprint
+            identityType: cluster.entityType,
+            clusterKey: cluster.clusterKey,
+            representativeEntityId: cluster.representativeEntityId,
+            supportingMatchMethods: [...new Set(supportingCandidates.map(item => item.matchMethod))].sort(),
+            supportingFingerprints: supportingCandidates.map(item => item.fingerprint).sort(),
+            transitiveResolution: true
           }
         });
       }
@@ -85,6 +128,8 @@ export async function executeEntityResolutionRun({ store, maxCandidates } = {}) 
       autoConfirmedCount: result.run.autoConfirmedCount,
       reviewRequiredCount: result.run.reviewRequiredCount,
       conflictCount: result.run.conflictCount,
+      clusterCount: result.clusters.length,
+      truncated: result.run.truncated,
       errors: []
     });
   } catch (error) {
