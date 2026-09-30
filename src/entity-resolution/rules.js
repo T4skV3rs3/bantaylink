@@ -276,7 +276,7 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
           rationale: conflict
             ? "Two records expose conflicting stable contractor identifiers and must not be merged."
             : "The source records expose the same typed stable external identifier; this is an identity match at the identifier level.",
-          evidenceObservationIds: makeEvidence(observationIndex, pair[0].id, pair[1].id),
+          evidenceObservationIds: makeEvidence(observationIndex, sourceEntity.id, targetEntity.id),
           payload: {
             namespace: external.namespace,
             value: external.value
