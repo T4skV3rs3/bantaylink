@@ -104,5 +104,8 @@ assert.equal(philgeps.entities[0].entityType, "procurement_event");
 assert.equal(philgeps.entities[0].canonicalKey, "philgeps:ABC-123");
 assert.equal(philgeps.entities[0].data.awardAmount, 1234567);
 assert.equal(philgeps.entities[0].data.awardee, "Test Builder");
+assert.equal(philgeps.entities.some(e => e.entityType === "contractor"), true);
+assert.equal(philgeps.edges.some(e => e.edgeType === "awarded_to"), true);
+assert.equal(philgeps.edges.some(e => e.edgeType === "procured_by"), true);
 
 console.log("Adapter normalization checks passed.");
