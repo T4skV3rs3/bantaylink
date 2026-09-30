@@ -210,6 +210,124 @@ export async function withTransaction(pool, work) {
     throw error;
   } finally {
     client.release();
+
+    async getCorrelationSnapshot() {
+      const [entities, observations, edges] = await Promise.all([
+        pool.query(\`SELECT id, entity_type AS "entityType", canonical_key AS "canonicalKey",
+                           label, data, first_seen_at AS "firstSeenAt", last_seen_at AS "lastSeenAt"
+                    FROM entities\`),
+        pool.query(\`SELECT id, entity_id AS "entityId", source_id AS "sourceId",
+                           ingestion_run_id AS "ingestionRunId", raw_document_id AS "rawDocumentId",
+                           record_type AS "recordType", source_record_id AS "sourceRecordId",
+                           observed_at AS "observedAt", content_hash AS "contentHash", data
+                    FROM observations\`),
+        pool.query(\`SELECT id, from_entity_id AS "fromEntityId", to_entity_id AS "toEntityId",
+                           edge_type AS "edgeType", source_id AS "sourceId",
+                           ingestion_run_id AS "ingestionRunId", raw_document_id AS "rawDocumentId",
+                           source_record_id AS "sourceRecordId", observed_at AS "observedAt",
+                           content_hash AS "contentHash", data
+                    FROM edges\`)
+      ]);
+
+      return {
+        entities: entities.rows,
+        observations: observations.rows,
+        edges: edges.rows
+      };
+    },
+
+    async startCorrelationRun(input) {
+      const result = await pool.query(
+        \`INSERT INTO correlation_runs (id, engine_version, status)
+         VALUES ($1,$2,'running')
+         RETURNING id, engine_version AS "engineVersion", status,
+                   started_at AS "startedAt", completed_at AS "completedAt",
+                   entity_count AS "entityCount", observation_count AS "observationCount",
+                   edge_count AS "edgeCount", finding_count AS "findingCount", errors\`,
+        [input.id, input.engineVersion]
+      );
+      return result.rows[0];
+    },
+
+    async insertCorrelationFinding(runId, finding) {
+      const result = await pool.query(
+        \`INSERT INTO correlation_findings
+          (id, correlation_run_id, rule_id, finding_type, status, fingerprint,
+           subject_entity_id, related_entity_ids, evidence_observation_ids,
+           evidence_edge_ids, payload)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)
+         ON CONFLICT (correlation_run_id, fingerprint) DO UPDATE
+           SET payload=EXCLUDED.payload,
+               status=EXCLUDED.status,
+               related_entity_ids=EXCLUDED.related_entity_ids,
+               evidence_observation_ids=EXCLUDED.evidence_observation_ids,
+               evidence_edge_ids=EXCLUDED.evidence_edge_ids
+         RETURNING id, correlation_run_id AS "correlationRunId", rule_id AS "ruleId",
+                   finding_type AS "findingType", status, fingerprint,
+                   subject_entity_id AS "subjectEntityId",
+                   related_entity_ids AS "relatedEntityIds",
+                   evidence_observation_ids AS "evidenceObservationIds",
+                   evidence_edge_ids AS "evidenceEdgeIds", payload\`,
+        [
+          finding.id,
+          runId,
+          finding.ruleId,
+          finding.findingType,
+          finding.status,
+          finding.fingerprint,
+          finding.subjectEntityId,
+          finding.relatedEntityIds,
+          finding.evidenceObservationIds,
+          finding.evidenceEdgeIds,
+          JSON.stringify(finding.payload)
+        ]
+      );
+      return result.rows[0];
+    },
+
+    async completeCorrelationRun(id, patch) {
+      const result = await pool.query(
+        \`UPDATE correlation_runs
+         SET status='completed',
+             completed_at=NOW(),
+             entity_count=$2,
+             observation_count=$3,
+             edge_count=$4,
+             finding_count=$5,
+             errors=$6::jsonb
+         WHERE id=$1
+         RETURNING id, engine_version AS "engineVersion", status,
+                   started_at AS "startedAt", completed_at AS "completedAt",
+                   entity_count AS "entityCount", observation_count AS "observationCount",
+                   edge_count AS "edgeCount", finding_count AS "findingCount", errors\`,
+        [
+          id,
+          patch.entityCount,
+          patch.observationCount,
+          patch.edgeCount,
+          patch.findingCount,
+          JSON.stringify(patch.errors ?? [])
+        ]
+      );
+      return result.rows[0];
+    },
+
+    async failCorrelationRun(id, error) {
+      const result = await pool.query(
+        \`UPDATE correlation_runs
+         SET status='failed',
+             completed_at=NOW(),
+             errors=errors || $2::jsonb
+         WHERE id=$1
+         RETURNING id, engine_version AS "engineVersion", status,
+                   started_at AS "startedAt", completed_at AS "completedAt",
+                   entity_count AS "entityCount", observation_count AS "observationCount",
+                   edge_count AS "edgeCount", finding_count AS "findingCount", errors\`,
+        [id, JSON.stringify([String(error?.message ?? error)])]
+      );
+      return result.rows[0];
+    }
+
   }
 }
 
