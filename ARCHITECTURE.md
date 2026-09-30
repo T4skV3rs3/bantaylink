@@ -41,14 +41,15 @@ Every adapter follows this sequence:
 1. Register the source and adapter metadata.
 2. Start an `ingestion_run`.
 3. Fetch raw records without discarding source-native identifiers.
-4. Hash the raw payload deterministically.
-5. Persist the raw document.
-6. Normalize the record into canonical entities, observations, and edges.
-7. Upsert canonical entities.
+4. Hash the payload deterministically (or use an adapter-supplied content hash).
+5. Persist the raw document before normalization.
+6. Normalize the record into canonical entities, observations, and source-backed edges.
+7. Validate the normalized shape and upsert canonical entities.
 8. Insert observations/edges only when their source-record key + content hash is new.
-9. Complete the run with counters, or mark it failed with an error trail.
+9. Record record-level normalization/persistence errors without discarding already captured raw evidence; strict mode can fail the run immediately.
+10. Complete the run with counters, or mark it failed when the fetch/run itself cannot continue.
 
-This makes repeated pulls idempotent at the observation/edge level while keeping the raw retrieval history available.
+This makes repeated pulls idempotent at the observation/edge level while keeping raw retrieval history available. The error trail is bounded so a noisy source cannot create an unbounded run record.
 
 ## Correlation engine v0.5
 
