@@ -48,6 +48,8 @@ function collectProjectYears(project) {
 
   for (const value of [
     data.infraYear,
+    toNumber(data.year),
+    toNumber(data.projectYear),
     yearFromDate(data.startDate),
     yearFromDate(data.contractEffectivityDate),
     yearFromDate(data.expiryDate),
@@ -83,7 +85,10 @@ function getElectionLocation(entity) {
 function projectObservationRows(snapshot, entityId) {
   return snapshot.observations
     .filter(row => row.entityId === entityId)
-    .sort((a, b) => String(a.observedAt).localeCompare(String(b.observedAt)));
+    .sort((a, b) =>
+      String(a.observedAt).localeCompare(String(b.observedAt)) ||
+      String(a.id).localeCompare(String(b.id))
+    );
 }
 
 function projectEntities(snapshot) {
@@ -170,7 +175,7 @@ export function findProjectStatusHistories(snapshot) {
       subjectEntityId: project.id,
       evidenceObservationIds,
       payload: {
-        statement: "This project has multiple source observations with differing published status and/or progress values.",
+        statement: "This project has multiple source observations with differing published status and/or progress values; this records source-state differences without asserting why they differ.",
         projectCanonicalKey: project.canonicalKey,
         projectLabel: project.label,
         observations: states
@@ -228,33 +233,36 @@ export function findContractorPortfolios(snapshot) {
   const groups = new Map();
 
   for (const project of projectEntities(snapshot)) {
-    const contractor = normalizeContractor(project.data?.contractor);
+    const contractor = contractorIdentity(project);
     if (!contractor) continue;
 
-    const item = groups.get(contractor) ?? [];
-    item.push(project);
-    groups.set(contractor, item);
+    const item = groups.get(contractor.key) ?? [];
+    item.push({ project, contractor });
+    groups.set(contractor.key, item);
   }
 
   const findings = [];
 
-  for (const [contractor, projects] of groups) {
-    const uniqueProjects = [...new Map(projects.map(project => [project.canonicalKey, project])).values()];
+  for (const [contractorKey, entries] of groups) {
+    const uniqueProjects = [...new Map(entries.map(entry => [entry.project.canonicalKey, entry])).values()];
+    const contractorBasis = uniqueProjects[0]?.contractor?.basis;
+    const projectRows = uniqueProjects.map(entry => entry.project);
     if (uniqueProjects.length < 2) continue;
 
     findings.push(baseFinding({
       ruleId: "contractor-project-portfolio",
       findingType: "CONTRACTOR_PORTFOLIO",
       status: "VERIFIED_FACT",
-      relatedEntityIds: uniqueProjects.map(project => project.id),
-      evidenceObservationIds: uniqueProjects.flatMap(project =>
+      relatedEntityIds: projectRows.map(project => project.id),
+      evidenceObservationIds: projectRows.flatMap(project =>
         projectObservationRows(snapshot, project.id).map(obs => obs.id)
       ),
       payload: {
-        statement: "The same normalized contractor name appears in multiple canonical project records.",
-        contractorDisplayName: uniqueProjects[0].data?.contractor,
-        contractorNormalizedKey: contractor,
-        projects: uniqueProjects.map(project => ({
+        statement: "The same contractor identity key appears in multiple canonical project records.",
+        contractorIdentityKey: contractorKey,
+        contractorIdentityBasis: contractorBasis,
+        contractorDisplayNames: [...new Set(projectRows.map(project => clean(project.data?.contractor)).filter(Boolean))].sort(),
+        projects: projectRows.map(project => ({
           entityId: project.id,
           canonicalKey: project.canonicalKey,
           label: project.label,
