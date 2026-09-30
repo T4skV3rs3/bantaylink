@@ -1,4 +1,5 @@
 import pg from "pg";
+import { sha256 } from "../ingestion/hash.js";
 
 const { Pool } = pg;
 
