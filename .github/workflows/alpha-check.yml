@@ -52,6 +52,16 @@ jobs:
           test -f src/correlation/rules.js
           test -f scripts/test-correlation.mjs
           test -f scripts/run-correlation.mjs
+          test -f api/correlations.js
+
+      - name: Syntax-check correlation code
+        run: |
+          node --check src/correlation/rules.js
+          node --check src/correlation/engine.js
+          node --check src/db/postgres.js
+          node --check scripts/test-correlation.mjs
+          node --check scripts/run-correlation.mjs
+          node --check api/correlations.js
 
       - name: Validate JSON
         run: |
