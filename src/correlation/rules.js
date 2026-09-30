@@ -1,6 +1,6 @@
 import { sha256 } from "../ingestion/hash.js";
 
-export const CORRELATION_ENGINE_VERSION = "0.5.0";
+export const CORRELATION_ENGINE_VERSION = "0.6.0";
 
 const MUNICIPAL_POSITIONS = new Set(["MAYOR", "VICE MAYOR", "COUNCILOR"]);
 const PROVINCIAL_POSITIONS = new Set([
@@ -30,6 +30,10 @@ function normalizeContractor(value) {
     .replace(/[^A-Z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function normalizeIdentifier(value) {
+  return clean(value).toUpperCase().replace(/\s+/g, " ");
 }
 
 function contractorIdentity(project) {
@@ -126,6 +130,77 @@ function electionEntities(snapshot) {
       (entity.data?.dataset === "NLE_Winners_2004-2025" ||
        entity.data?.dataset == null)
   );
+}
+
+function procurementEntities(snapshot) {
+  return snapshot.entities.filter(entity => entity.entityType === "procurement_event");
+}
+
+function edgeIndexByEntity(snapshot) {
+  const index = new Map();
+  for (const edge of snapshot.edges) {
+    for (const entityId of [edge.fromEntityId, edge.toEntityId]) {
+      if (!entityId) continue;
+      const rows = index.get(entityId) ?? [];
+      rows.push(edge);
+      index.set(entityId, rows);
+    }
+  }
+  return index;
+}
+
+function entityEdges(edgeIndex, entityId, edgeTypes = null) {
+  const rows = edgeIndex.get(entityId) ?? [];
+  if (!edgeTypes) return rows;
+  return rows.filter(edge => edgeTypes.has(edge.edgeType));
+}
+
+function projectContractId(project) {
+  const value = normalizeIdentifier(project.data?.contractId);
+  if (value) return value;
+
+  const match = clean(project.canonicalKey).match(/^dpwh-contract:(.+)$/i);
+  return normalizeIdentifier(match?.[1]);
+}
+
+function procurementReference(event) {
+  return normalizeIdentifier(event.data?.referenceNumber);
+}
+
+function eligibleProcurementEntity(event) {
+  const reference = procurementReference(event);
+  if (!reference) return false;
+
+  const eventType = clean(event.data?.eventType).toLowerCase();
+  if (eventType === "bid_notice") return false;
+
+  return Boolean(
+    eventType === "award" ||
+    eventType === "contract" ||
+    event.data?.awardee ||
+    event.data?.awardAmount != null ||
+    event.data?.contractAmount != null
+  );
+}
+
+function latestObservationsBySource(observations) {
+  const latest = new Map();
+
+  for (const observation of observations) {
+    const prior = latest.get(observation.sourceId);
+    if (
+      !prior ||
+      String(observation.observedAt).localeCompare(String(prior.observedAt)) > 0 ||
+      (
+        String(observation.observedAt) === String(prior.observedAt) &&
+        String(observation.id).localeCompare(String(prior.id)) > 0
+      )
+    ) {
+      latest.set(observation.sourceId, observation);
+    }
+  }
+
+  return [...latest.values()].sort((a, b) => String(a.sourceId).localeCompare(String(b.sourceId)));
 }
 
 function baseFinding({
@@ -259,6 +334,210 @@ export function findProjectSourceDivergence(snapshot, observationIndex = createO
           .sort((a, b) => a.sourceId.localeCompare(b.sourceId))
       }
     }));
+  }
+
+  return findings;
+}
+
+export function findProjectSourceStatusDivergence(snapshot, observationIndex = createObservationIndex(snapshot)) {
+  const findings = [];
+
+  for (const project of projectEntities(snapshot)) {
+    const observations = entityObservations(observationIndex, project.id, "project");
+    const latest = latestObservationsBySource(observations);
+    if (latest.length < 2) continue;
+
+    const statusValues = [...new Set(
+      latest.map(obs => clean(obs.data?.status)).filter(Boolean)
+    )].sort();
+
+    const progressValues = [...new Set(
+      latest
+        .map(obs => toNumber(obs.data?.progress))
+        .filter(value => value != null)
+    )].sort((a, b) => a - b);
+
+    if (statusValues.length <= 1 && progressValues.length <= 1) continue;
+
+    findings.push(baseFinding({
+      ruleId: "project-source-status-divergence",
+      findingType: "SOURCE_STATUS_DIVERGENCE",
+      status: "VERIFIED_FACT",
+      dedupeKey: {
+        projectCanonicalKey: project.canonicalKey,
+        latestBySource: latest.map(obs => ({
+          sourceId: obs.sourceId,
+          observedAt: obs.observedAt,
+          sourceRecordId: obs.sourceRecordId,
+          status: clean(obs.data?.status),
+          progress: toNumber(obs.data?.progress),
+          contentHash: obs.contentHash
+        }))
+      },
+      subjectEntityId: project.id,
+      evidenceObservationIds: latest.map(obs => obs.id),
+      payload: {
+        statement: "The latest ingested observation from each contributing source contains differing published project status and/or progress values.",
+        projectCanonicalKey: project.canonicalKey,
+        sources: latest.map(obs => ({
+          sourceId: obs.sourceId,
+          observationId: obs.id,
+          observedAt: obs.observedAt,
+          sourceRecordId: obs.sourceRecordId,
+          status: clean(obs.data?.status) || null,
+          progress: toNumber(obs.data?.progress)
+        })),
+        differingFields: [
+          ...(statusValues.length > 1 ? ["status"] : []),
+          ...(progressValues.length > 1 ? ["progress"] : [])
+        ],
+        interpretationLimit: "This records a source-value divergence at the latest ingested observations; it does not determine which source is correct, when a correction occurred, or why the values differ."
+      }
+    }));
+  }
+
+  return findings;
+}
+
+export function findProjectProcurementLinks(snapshot, observationIndex = createObservationIndex(snapshot)) {
+  const findings = [];
+  const procurementsByReference = new Map();
+  const edgeIndex = edgeIndexByEntity(snapshot);
+
+  for (const event of procurementEntities(snapshot)) {
+    if (!eligibleProcurementEntity(event)) continue;
+    const reference = procurementReference(event);
+    const rows = procurementsByReference.get(reference) ?? [];
+    rows.push(event);
+    procurementsByReference.set(reference, rows);
+  }
+
+  for (const project of projectEntities(snapshot)) {
+    const contractId = projectContractId(project);
+    if (!contractId) continue;
+
+    for (const event of procurementsByReference.get(contractId) ?? []) {
+      const projectObservations = entityObservations(observationIndex, project.id, "project");
+      const procurementObservations = entityObservations(
+        observationIndex,
+        event.id,
+        "procurement_event"
+      );
+
+      const projectContractorId = normalizeIdentifier(project.data?.pcabId);
+      const procurementContractorId = normalizeIdentifier(event.data?.pcabId);
+      const contractorIdConflict =
+        projectContractorId &&
+        procurementContractorId &&
+        projectContractorId !== procurementContractorId;
+
+      const projectEdges = entityEdges(edgeIndex, project.id, new Set(["contracted_to"]));
+      const procurementEdges = entityEdges(
+        edgeIndex,
+        event.id,
+        new Set(["awarded_to", "procured_by"])
+      );
+
+      const evidenceEdgeIds = [...new Set(
+        [...projectEdges, ...procurementEdges].map(edge => edge.id)
+      )].sort();
+
+      const relatedEntityIds = [project.id, event.id];
+
+      const path = [
+        {
+          step: 1,
+          kind: "derived_join",
+          basis: "project.contractId=procurement.referenceNumber",
+          fromEntityId: project.id,
+          toEntityId: event.id,
+          value: contractId
+        },
+        ...procurementEdges
+          .sort((a, b) => String(a.id).localeCompare(String(b.id)))
+          .map((edge, index) => ({
+            step: index + 2,
+            kind: "source_edge",
+            edgeId: edge.id,
+            edgeType: edge.edgeType,
+            fromEntityId: edge.fromEntityId,
+            toEntityId: edge.toEntityId
+          }))
+      ];
+
+      if (contractorIdConflict) {
+        findings.push(baseFinding({
+          ruleId: "project-procurement-contractor-identifier-conflict",
+          findingType: "PROJECT_PROCUREMENT_CONTRACTOR_CONFLICT",
+          status: "VERIFIED_FACT",
+          dedupeKey: {
+            projectCanonicalKey: project.canonicalKey,
+            procurementCanonicalKey: event.canonicalKey,
+            contractId,
+            projectPcabId: projectContractorId,
+            procurementPcabId: procurementContractorId
+          },
+          subjectEntityId: project.id,
+          relatedEntityIds,
+          evidenceObservationIds: [
+            ...projectObservations.map(obs => obs.id),
+            ...procurementObservations.map(obs => obs.id)
+          ],
+          evidenceEdgeIds,
+          payload: {
+            statement: "A project and procurement record share the same normalized contract/reference identifier but publish different PCAB identifiers.",
+            joinBasis: "project.contractId=procurement.referenceNumber",
+            contractId,
+            projectPcabId: projectContractorId,
+            procurementPcabId: procurementContractorId,
+            projectContractor: project.data?.contractor ?? null,
+            procurementAwardee: event.data?.awardee ?? null,
+            path,
+            interpretationLimit: "This records conflicting contractor identifiers across two source records; it does not establish an error, award irregularity, contractor identity, or wrongdoing."
+          }
+        }));
+        continue;
+      }
+
+      findings.push(baseFinding({
+        ruleId: "project-procurement-identifier-link",
+        findingType: "PROJECT_PROCUREMENT_LINK",
+        status: "VERIFIED_FACT",
+        dedupeKey: {
+          projectCanonicalKey: project.canonicalKey,
+          procurementCanonicalKey: event.canonicalKey,
+          contractId,
+          procurementEventType: clean(event.data?.eventType).toLowerCase(),
+          projectPcabId: projectContractorId || null,
+          procurementPcabId: procurementContractorId || null
+        },
+        subjectEntityId: project.id,
+        relatedEntityIds,
+        evidenceObservationIds: [
+          ...projectObservations.map(obs => obs.id),
+          ...procurementObservations.map(obs => obs.id)
+        ],
+        evidenceEdgeIds,
+        payload: {
+          statement: "A project record and procurement record publish the same normalized contract/reference identifier.",
+          joinBasis: "project.contractId=procurement.referenceNumber",
+          contractId,
+          procurementEventType: event.data?.eventType ?? null,
+          projectPcabId: projectContractorId || null,
+          procurementPcabId: procurementContractorId || null,
+          pcabMatch: Boolean(
+            projectContractorId &&
+            procurementContractorId &&
+            projectContractorId === procurementContractorId
+          ),
+          projectContractor: project.data?.contractor ?? null,
+          procurementAwardee: event.data?.awardee ?? null,
+          procuringEntity: event.data?.procuringEntity ?? null,
+          path,
+          interpretationLimit: "The identifier join establishes a documented cross-source link only. It does not by itself establish project performance, payment correctness, award compliance, misconduct, or causation."
+        }
+      }));
+    }
   }
 
   return findings;
@@ -530,6 +809,8 @@ export function runCorrelationRules(snapshot) {
   return [
     ...findProjectStatusHistories(snapshot, observationIndex),
     ...findProjectSourceDivergence(snapshot, observationIndex),
+    ...findProjectSourceStatusDivergence(snapshot, observationIndex),
+    ...findProjectProcurementLinks(snapshot, observationIndex),
     ...findContractorPortfolios(snapshot, observationIndex),
     ...findElectionProjectOverlaps(snapshot, observationIndex),
     ...findElectionProjectContractorOverlaps(snapshot, observationIndex)
