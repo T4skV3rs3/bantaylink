@@ -141,9 +141,14 @@ export const daSidlanAdapter = {
       if (limit != null && yielded >= limit) return;
       yield {
         payload: item,
-        url: url.toString(),
+        url: redactUrl(url.toString()),
+        retrievalUrl: response.url,
+        requestMethod: "GET",
+        responseHeaders: headersToObject(response.headers),
         httpStatus: response.status,
         mimeType: response.headers.get("content-type") || "application/json",
+        payloadEncoding: "utf-8",
+        hashScope: "canonical_payload",
         contentHash: sha256(item)
       };
       yielded += 1;
