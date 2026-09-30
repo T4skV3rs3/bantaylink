@@ -70,7 +70,10 @@ function collectProjectYears(project) {
     yearFromDate(data.startDate),
     yearFromDate(data.contractEffectivityDate),
     yearFromDate(data.expiryDate),
-    yearFromDate(data.completionDate)
+    yearFromDate(data.completionDate),
+    yearFromDate(data.procurement?.advertisementDate),
+    yearFromDate(data.procurement?.dateOfAward),
+    yearFromDate(data.procurement?.bidSubmissionDeadline)
   ]) {
     if (Number.isInteger(value)) years.add(value);
   }
@@ -115,7 +118,8 @@ function electionEntities(snapshot) {
   return snapshot.entities.filter(
     entity =>
       entity.entityType === "election_result" &&
-      entity.data?.dataset !== "NLE_Vote_Counts_2007-2025"
+      (entity.data?.dataset === "NLE_Winners_2004-2025" ||
+       entity.data?.dataset == null)
   );
 }
 
@@ -283,7 +287,7 @@ export function findContractorPortfolios(snapshot, observationIndex = createObse
     findings.push(baseFinding({
       ruleId: "contractor-project-portfolio",
       findingType: "CONTRACTOR_PORTFOLIO",
-      status: "VERIFIED_FACT",
+      status: contractorBasis === "normalized_contractor_name" ? "INFERENCE_LEAD" : "VERIFIED_FACT",
       dedupeKey: {
         contractorIdentityKey: contractorKey,
         projectCanonicalKeys: projectRows.map(project => project.canonicalKey)
