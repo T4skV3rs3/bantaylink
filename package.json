@@ -6,7 +6,8 @@
   "scripts": {
     "test:ingestion": "node scripts/test-ingestion.mjs",
     "test:adapters": "node scripts/test-adapters.mjs",
-    "test": "npm run test:ingestion && npm run test:adapters",
+    "test:correlation": "node scripts/test-correlation.mjs",
+    "test": "npm run test:ingestion && npm run test:adapters && npm run test:correlation",
     "ingest:seed": "node scripts/ingest-seed.mjs",
     "ingest:source": "node scripts/ingest-source.mjs",
     "correlate": "node scripts/run-correlation.mjs",
