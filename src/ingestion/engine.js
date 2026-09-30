@@ -94,7 +94,7 @@ async function linkOccurrence(store, kind, occurrence) {
     ? "store.linkObservationOccurrence"
     : "store.linkEdgeOccurrence");
 
-  await method(occurrence);
+  await method.call(store, occurrence);
 }
 
 export async function ingestAdapter({ adapter, store, options = {} }) {
