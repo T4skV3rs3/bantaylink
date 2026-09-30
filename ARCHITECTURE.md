@@ -66,6 +66,27 @@ The last two are \`INFERENCE_LEAD\` findings. They do not establish a role in a 
 
 Finding fingerprints are deterministic from rule/version/entity keys rather than volatile database row IDs, so repeated runs can be compared. Database finding IDs are run-scoped.
 
+## Entity resolution
+
+The entity-resolution layer is deterministic and derived. `src/entity-resolution/rules.js` generates only reviewable identity candidates from source-backed entities; `src/entity-resolution/engine.js` persists candidates, identifier-backed assertions, and deterministic identity clusters.
+
+Resolution rules currently include:
+- typed stable-identifier matching for source entities such as projects, contractors, procurement events, source documents, and person records when an explicit stable person identifier exists;
+- conservative person-name matching using normalized name variants plus locality, province, or compatible office/time context, always classified as `REVIEW_REQUIRED`;
+- contractor-name matching as `REVIEW_REQUIRED` when no stable identifier exists;
+- conflicting contractor-name / PCAB pairs as `CONFLICT`;
+- deterministic connected components for `AUTO_CONFIRMED` same-type identifier matches.
+
+OpenHalalan vote-count entities are excluded from person identity resolution. Same-surname matching is never sufficient for a person merge or family relationship. Auto-confirmed assertions retain the candidate fingerprint and source observation/edge references, and the database prevents resolution candidate/assertion records from disappearing through source-entity deletion.
+
+Identity clusters are derived topology over explicit identifier matches. They do not rewrite or replace source-backed entities.
+
+## Evidence UI and trace API
+
+`/api/entity/:id` (served by `api/entity.js`) exposes the selected entity, source-backed observations and edges, repeat-run occurrences, resolution candidates/assertions/clusters, and raw retrieval metadata. Raw payload content is returned only when `includeRaw=1` is supplied.
+
+`/api/evidence` accepts an entity ID, canonical key, correlation finding ID, resolution candidate ID, observation IDs, and/or edge IDs and returns the complete evidence bundle behind that selection. The UI presents the evidence chain rather than collapsing it into a single score.
+
 ## Infrastructure signal taxonomy
 
 - `terminated`
