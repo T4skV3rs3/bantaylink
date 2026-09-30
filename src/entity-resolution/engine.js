@@ -49,6 +49,7 @@ export async function executeEntityResolutionRun({ store, maxCandidates } = {}) 
       !store?.startEntityResolutionRun ||
       !store?.insertEntityResolutionCandidate ||
       !store?.insertEntityResolutionAssertion ||
+      !store?.insertEntityResolutionCluster ||
       !store?.completeEntityResolutionRun ||
       !store?.failEntityResolutionRun) {
     throw new Error("Entity-resolution store is missing required run/candidate methods.");
