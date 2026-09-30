@@ -235,6 +235,7 @@ export class MemoryStore {
       autoConfirmedCount: 0,
       reviewRequiredCount: 0,
       conflictCount: 0,
+      clusterCount: 0,
       errors: []
     };
     if (!this.entityResolutionRuns) this.entityResolutionRuns = new Map();
@@ -262,6 +263,14 @@ export class MemoryStore {
     run.completedAt = new Date().toISOString();
     run.errors.push(String(error?.message ?? error));
     return run;
+  }
+
+  async insertEntityResolutionCluster(runId, cluster) {
+    if (!this.entityResolutionClusters) this.entityResolutionClusters = new Map();
+    const id = cluster.id || runId + ":" + cluster.clusterKey;
+    const row = { id, entityResolutionRunId: runId, ...cluster };
+    this.entityResolutionClusters.set(id, row);
+    return row;
   }
 
   async insertEntityResolutionAssertion(assertion) {
