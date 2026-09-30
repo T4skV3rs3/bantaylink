@@ -3,31 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BantayLink — Public Accountability Explorer</title>
+<title>BantayLink — Evidence Explorer</title>
 <style>
-:root{--bg:#0a0d12;--panel:#11161e;--panel2:#151b24;--line:#28303b;--text:#edf2f7;--muted:#9aa5b1;--accent:#d8b36a;--blue:#7fb6ff;--warn:#f3c56b;--good:#77d7b1;--max:1260px}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 80% -10%,#202a38 0,#0a0d12 42%);color:var(--text);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-button,input{font:inherit}button{color:inherit}a{color:inherit}
-.shell{max-width:var(--max);margin:auto;padding:28px 22px 50px}
-.top{display:flex;justify-content:space-between;gap:22px;align-items:flex-end;padding:10px 0 22px;border-bottom:1px solid var(--line)}
-.brandline{display:flex;gap:12px;align-items:center}.mark{width:42px;height:42px;border:1px solid #d8b36a66;border-radius:12px;display:grid;place-items:center;font-family:Georgia,serif;font-size:23px;color:var(--accent);background:#d8b36a0d}
-.eyebrow,.tiny{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}h1,h2,h3,p{margin:0}h1{font:700 30px/1.05 Georgia,serif;margin-top:3px}.subtitle{margin-top:8px;color:var(--muted);max-width:680px}
-.status{font-size:12px;color:var(--good);border:1px solid #77d7b133;border-radius:999px;padding:7px 10px;white-space:nowrap}
-.tabs{display:flex;gap:6px;flex-wrap:wrap;padding:18px 0 14px}.tab{background:transparent;border:1px solid transparent;border-radius:9px;padding:9px 12px;color:var(--muted);cursor:pointer}.tab.active{background:#ffffff08;border-color:var(--line);color:var(--text)}
-.searchrow{display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:20px}.search{background:#0f141b;border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;gap:10px;align-items:center}.search input{width:100%;border:0;outline:0;background:transparent;color:var(--text)}kbd{font-size:11px;color:var(--muted);border:1px solid var(--line);padding:2px 6px;border-radius:5px}
-.grid{display:grid;gap:14px}.hero{grid-template-columns:1.25fr .9fr}.cols{grid-template-columns:repeat(3,1fr)}.two{grid-template-columns:1.3fr .8fr}
-.panel{background:linear-gradient(180deg,#131922,#10151c);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:0 14px 34px #0000001f}.heroTitle{font:700 34px/1.05 Georgia,serif;max-width:620px}.heroCopy{color:var(--muted);max-width:640px;margin-top:11px}
-.statbar{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:22px}.stat{background:#ffffff04;border:1px solid var(--line);border-radius:10px;padding:12px}.stat b{display:block;font-size:24px}.stat span{color:var(--muted);font-size:12px}
-.section{display:flex;justify-content:space-between;align-items:center;margin:28px 0 10px}.section h2{font-size:13px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
-.cards{grid-template-columns:repeat(3,1fr)}.card{border:1px solid var(--line);background:#10151c;border-radius:12px;text-align:left;padding:16px;cursor:pointer;transition:.15s}.card:hover,.card.selected{transform:translateY(-1px);border-color:#526073}.cardtop{display:flex;justify-content:space-between;align-items:center}.id{font-weight:700;letter-spacing:.04em}.pill{font-size:11px;border:1px solid;padding:4px 8px;border-radius:999px}.warn{color:var(--warn);border-color:#f3c56b44;background:#f3c56b0d}.blue{color:var(--blue);border-color:#7fb6ff44;background:#7fb6ff0b}.good{color:var(--good);border-color:#77d7b144;background:#77d7b10b}.card h3{font-size:16px;margin-top:14px}.muted{color:var(--muted)}.meta{display:flex;gap:12px;color:var(--muted);font-size:12px;margin:8px 0}.card p{color:#cbd4df;font-size:13px}
-.drawer{margin-top:14px}.detailgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}.detailgrid div{border:1px solid var(--line);border-radius:10px;padding:11px}.detailgrid span{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}.detailgrid strong{display:block;margin-top:5px}
-.evidence{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}.evidenceRow{display:flex;justify-content:space-between;gap:14px;align-items:center;text-decoration:none;border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:8px}.evidenceRow strong,.evidenceRow small{display:block}.evidenceRow small{color:var(--muted);margin-top:3px}.sourceKind{display:inline-block;color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
-.table{width:100%;border-collapse:collapse}.table th,.table td{padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}.table th{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}.table td span{display:block;color:var(--muted);font-size:12px;margin-top:2px}.clickrow{cursor:pointer}.clickrow:hover td{background:#ffffff03}
-.note{color:#cbd4df;max-width:880px}.boxes{margin-top:18px}.box{border:1px solid var(--line);border-radius:12px;padding:15px}.box .big{font:700 20px Georgia,serif;margin:4px 0 6px}.box p{color:var(--muted);font-size:13px}
-.person{display:flex;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}.avatar{width:32px;height:32px;border:1px solid var(--line);border-radius:9px;display:grid;place-items:center;color:var(--accent)}.person strong,.person small,.person span{display:block}.person span,.person small{color:var(--muted);font-size:12px}
-footer{margin-top:30px;border-top:1px solid var(--line);padding-top:14px;color:var(--muted);font-size:11px}
-.empty{padding:34px;text-align:center;color:var(--muted)}.error{border-color:#d9777744;color:#f4b3b3}
-@media(max-width:900px){.hero,.two,.cards,.cols{grid-template-columns:1fr}.detailgrid{grid-template-columns:repeat(2,1fr)}.top{align-items:flex-start;flex-direction:column}.status{align-self:flex-start}}
+:root{--bg:#080b10;--panel:#10151d;--panel2:#151c26;--line:#29313d;--text:#edf2f7;--muted:#97a3b0;--accent:#d8b36a;--blue:#7fb6ff;--warn:#f0c675;--good:#76d5b0;--red:#e9a2a2;--max:1320px}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 80% -10%,#1d2632 0,#080b10 44%);color:var(--text);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input,select{font:inherit}button{color:inherit}a{color:inherit}.shell{max-width:var(--max);margin:auto;padding:26px 20px 48px}
+.top{display:flex;justify-content:space-between;gap:22px;align-items:flex-start;padding:8px 0 22px;border-bottom:1px solid var(--line)}
+.brandline{display:flex;gap:12px;align-items:center}.mark{width:42px;height:42px;border:1px solid #d8b36a66;border-radius:12px;display:grid;place-items:center;color:var(--accent);font:700 23px Georgia,serif;background:#d8b36a0d}.eyebrow,.tiny{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted)}
+h1{font:700 30px/1.05 Georgia,serif;margin:3px 0 0}.subtitle{margin:8px 0 0;color:var(--muted);max-width:760px}.status{font-size:12px;color:var(--good);border:1px solid #76d5b033;border-radius:999px;padding:7px 10px;white-space:nowrap}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;padding:17px 0 12px}.tab{background:transparent;border:1px solid transparent;border-radius:9px;padding:9px 12px;color:var(--muted);cursor:pointer}.tab.active{background:#ffffff08;border-color:var(--line);color:var(--text)}
+.searchrow{display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:16px}.search{background:#0f141b;border:1px solid var(--line);border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:9px}.search input{width:100%;border:0;outline:0;background:transparent;color:var(--text)}kbd{font-size:11px;color:var(--muted);border:1px solid var(--line);padding:2px 6px;border-radius:5px}.refresh{border:1px solid var(--line);background:#11161e;border-radius:10px;padding:0 13px;cursor:pointer}
+.grid{display:grid;gap:13px}.cols3{grid-template-columns:repeat(3,1fr)}.cols2{grid-template-columns:repeat(2,1fr)}.hero{grid-template-columns:1.35fr .9fr}.two{grid-template-columns:1.25fr .9fr}
+.panel{background:linear-gradient(180deg,#121922,#0e131a);border:1px solid var(--line);border-radius:14px;padding:17px;box-shadow:0 16px 34px #00000018}.panel h2{margin:0;font-size:19px}.panel h3{margin:0;font-size:15px}
+.heroTitle{font:700 35px/1.04 Georgia,serif;max-width:720px}.heroCopy{color:var(--muted);max-width:720px;margin:10px 0 0}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:20px}.stat{border:1px solid var(--line);border-radius:10px;padding:11px;background:#ffffff04}.stat b{display:block;font-size:23px}.stat span{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.section{display:flex;justify-content:space-between;align-items:center;margin:24px 0 10px}.section h2,.sectionTitle{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin:0}.muted{color:var(--muted)}.small{font-size:12px}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}.card{width:100%;border:1px solid var(--line);background:#10151c;border-radius:12px;text-align:left;padding:14px;cursor:pointer}.card:hover{border-color:#526073}.cardtop{display:flex;justify-content:space-between;align-items:center;gap:10px}.id{font-weight:700;letter-spacing:.04em}.pill{font-size:10px;border:1px solid;padding:4px 7px;border-radius:999px;white-space:nowrap}.warn{color:var(--warn);border-color:#f0c67544;background:#f0c6750b}.blue{color:var(--blue);border-color:#7fb6ff44;background:#7fb6ff0b}.good{color:var(--good);border-color:#76d5b044;background:#76d5b00b}.lead{color:var(--accent);border-color:#d8b36a44;background:#d8b36a0b}.card h3{margin-top:12px}.meta{display:flex;gap:11px;color:var(--muted);font-size:11px;margin:7px 0}.card p{color:#cbd4df;font-size:12px;margin:0}
+.table{width:100%;border-collapse:collapse}.table th,.table td{padding:11px 9px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}.table th{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}.table td span{display:block;color:var(--muted);font-size:11px;margin-top:2px}.clickrow{cursor:pointer}.clickrow:hover td{background:#ffffff03}
+.trace{margin-top:13px}.traceHeader{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.traceGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}.traceBlock{border:1px solid var(--line);border-radius:11px;padding:12px;background:#ffffff02}.traceBlock .label{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.1em}.traceBlock .value{margin-top:4px}.chain{display:grid;gap:7px;margin-top:12px}.chainItem{border-left:2px solid #43505f;padding:9px 11px;background:#ffffff03;border-radius:0 8px 8px 0}.chainItem b{display:block;font-size:12px}.chainItem small{color:var(--muted);display:block;margin-top:2px}.hash{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;word-break:break-all;color:#b9c4cf}.raw{margin-top:10px}.raw summary{cursor:pointer;color:var(--muted)}.raw pre{white-space:pre-wrap;word-break:break-word;background:#0a0e14;border:1px solid var(--line);padding:10px;border-radius:8px;max-height:320px;overflow:auto;font-size:11px}
+.filters{display:flex;gap:8px;flex-wrap:wrap}.filters select{background:#0f141b;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 9px}.resolutionCard{border:1px solid var(--line);border-radius:11px;padding:13px;background:#ffffff02}.resolutionCard + .resolutionCard{margin-top:8px}.resolutionPair{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:stretch}.identity{border:1px solid var(--line);border-radius:9px;padding:10px}.identity .name{font-weight:700}.identity small{display:block;color:var(--muted);margin-top:3px}.arrow{display:grid;place-items:center;color:var(--accent);padding:0 4px}.note{color:#cbd4df;max-width:930px}.notice{border:1px solid #d8b36a2f;background:#d8b36a08;border-radius:10px;padding:11px 12px;color:#d7dfe8;font-size:12px}.error{border-color:#d9777744;color:#f4b3b3}.empty{padding:32px;text-align:center;color:var(--muted)}footer{margin-top:30px;border-top:1px solid var(--line);padding-top:13px;color:var(--muted);font-size:10px}
+@media(max-width:950px){.hero,.two,.cols3,.cols2,.cards,.traceGrid,.resolutionPair{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.top{flex-direction:column}.searchrow{grid-template-columns:1fr}.refresh{height:42px}}
 </style>
 </head>
 <body>
@@ -35,35 +28,147 @@ footer{margin-top:30px;border-top:1px solid var(--line);padding-top:14px;color:v
 <header class="top">
   <div>
     <div class="brandline"><div class="mark">B</div><div><div class="eyebrow">PHILIPPINES · PUBLIC RECORDS</div><h1>Trace the record.</h1></div></div>
-    <p class="subtitle">Connect election histories, political-family research, procurement, infrastructure status, and audit evidence without turning a lead into a conclusion.</p>
+    <p class="subtitle">Evidence-first exploration of election records, infrastructure, procurement, and source-linked research leads. A finding is only as strong as the evidence path behind it.</p>
   </div>
-  <div class="status">● Evidence-first alpha</div>
+  <div class="status">● Evidence layer ready</div>
 </header>
 <nav class="tabs" id="tabs"></nav>
 <div class="searchrow">
-  <label class="search"><span>⌕</span><input id="q" aria-label="Search" placeholder="Search project IDs, localities, offices, families…"><kbd>Ctrl K</kbd></label>
+  <label class="search"><span>⌕</span><input id="q" aria-label="Search" placeholder="Search project IDs, people, contractors, localities, findings…"><kbd>Ctrl K</kbd></label>
+  <button class="refresh" id="refresh">Refresh records</button>
 </div>
-<main id="app"><div class="empty">Loading alpha records…</div></main>
-<footer>Alpha data is intentionally small. Every production record should retain its source class, source URL, retrieval date, and source-native identifier. Correlations remain research leads until underlying records establish the relationship.</footer>
+<main id="app"><div class="empty">Loading BantayLink…</div></main>
+<footer>Source-native labels are preserved. Identity matching is conservative; documented family relationships and person merges require evidence. Correlation leads do not establish causation or wrongdoing.</footer>
 </div>
 <script>
-const NAV=[["overview","Overview"],["projects","Infrastructure watch"],["dynasties","Political families"],["correlations","Correlations"]];
-let state={tab:"overview",query:"",records:[],selected:null};
+const NAV=[
+  ["overview","Overview"],
+  ["projects","Infrastructure"],
+  ["resolution","Entity resolution"],
+  ["correlations","Correlations"],
+  ["evidence","Evidence trail"]
+];
+let state={tab:"overview",query:"",records:[],findings:[],resolution:null,selectedProject:null,selectedFinding:null,evidence:null,loading:true,error:null};
+
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const projects=()=>state.records.filter(r=>r.type==="project");
-const people=()=>state.records.filter(r=>r.type==="person");
-const filteredProjects=()=>projects().filter(p=>!state.query || [p.id,p.name,p.location,p.status,p.agency,p.signal].join(" ").toLowerCase().includes(state.query.toLowerCase()));
-function projectClass(p){return (p.status||"").toLowerCase().includes("suspend")?"warn":"blue"}
-function renderTabs(){document.querySelector("#tabs").innerHTML=NAV.map(([id,label])=>'<button class="tab '+(state.tab===id?"active":"")+'" data-tab="'+id+'">'+label+"</button>").join("");document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{state.tab=b.dataset.tab;render()})}
-function card(p){return '<button class="card '+(state.selected===p.id?"selected":"")+'" data-project="'+esc(p.id)+'"><div class="cardtop"><span class="id">'+esc(p.id)+'</span><span class="pill '+projectClass(p)+'">'+esc(p.status)+'</span></div><h3>'+esc(p.name)+'</h3><div class="meta"><span>⌖ '+esc(p.location)+'</span><span>▣ '+esc(p.agency)+'</span></div><p>'+esc(p.signal)+'</p></button>'}
-function detail(){const p=projects().find(x=>x.id===state.selected)||filteredProjects()[0];if(!p)return '<div class="panel empty">Select an infrastructure record to inspect its provenance.</div>';state.selected=p.id;return '<section class="panel drawer"><div class="eyebrow">RECORD DETAIL</div><h2 style="margin-top:5px">'+esc(p.id)+' · '+esc(p.name)+'</h2><p class="note" style="margin-top:8px">'+esc(p.notes||"Review the linked evidence before drawing conclusions.")+'</p><div class="detailgrid"><div><span>Status</span><strong>'+esc(p.status)+'</strong></div><div><span>Agency</span><strong>'+esc(p.agency)+'</strong></div><div><span>Location</span><strong>'+esc(p.location)+'</strong></div><div><span>Signal</span><strong>'+esc(p.signal)+'</strong></div></div><div class="evidence"><div class="eyebrow">EVIDENCE TRAIL</div>'+((p.evidence||[]).map(e=>'<a class="evidenceRow" href="'+esc(e.url)+'" target="_blank" rel="noreferrer"><div><span class="sourceKind">'+esc(e.class||"source")+'</span><strong>'+esc(e.title)+'</strong><small>'+esc(e.date||"Date not supplied by seed")+'</small></div><span>↗</span></a>').join("")||'<div class="empty">No evidence links in this seed record.</div>')+'</div></section>'}
-function overview(){const ps=filteredProjects();return '<div class="grid hero"><section class="panel"><div class="eyebrow">MVP / RESEARCH MODE</div><div class="heroTitle" style="margin-top:6px">A public-record graph for follow-the-record questions.</div><p class="heroCopy">Start with machine-readable election datasets, government infrastructure records, eFOI responses, audit repositories, and procurement records. Every connection carries provenance.</p><div class="statbar"><div class="stat"><b>'+projects().length+'</b><span>seed infrastructure records</span></div><div class="stat"><b>'+people().length+'</b><span>research person records</span></div><div class="stat"><b>'+new Set(state.records.flatMap(r=>(r.evidence||[]).map(e=>e.url))).size+'</b><span>linked source URLs</span></div></div></section><section class="panel"><div class="eyebrow">RELATIONSHIP PREVIEW</div><div class="boxes grid" style="margin-top:12px"><div class="box"><div class="big">Official / family</div><p>Election and relationship records are separate until kinship evidence is documented.</p></div><div class="box"><div class="big">Project</div><p>Infrastructure records keep the agency and source-native status visible.</p></div><div class="box"><div class="big">Government record</div><p>Every research lead can be opened back to its source document or dataset.</p></div></div></section></div><div class="section"><h2>Infrastructure watch</h2><span class="muted">'+ps.length+' records</span></div><div class="grid cards">'+ps.slice(0,3).map(card).join("")+'</div>'+detail()}
-function projectsView(){const ps=filteredProjects();return '<section class="panel"><div class="section" style="margin-top:0"><h2>Infrastructure watchlist</h2><span class="muted">'+ps.length+' records</span></div>'+(ps.length?'<table class="table"><thead><tr><th>Project</th><th>Location</th><th>Status</th><th>Signal</th><th>Evidence</th></tr></thead><tbody>'+ps.map(p=>'<tr class="clickrow" data-project="'+esc(p.id)+'"><td><strong>'+esc(p.id)+'</strong><span>'+esc(p.name)+'</span></td><td>'+esc(p.location)+'</td><td><span class="pill '+projectClass(p)+'">'+esc(p.status)+'</span></td><td>'+esc(p.signal)+'</td><td>'+((p.evidence||[]).length)+' source(s)</td></tr>').join("")+'</tbody></table>':'<div class="empty">No project records match this search.</div>')+'</section>'+detail()}
-function dynasties(){return '<div class="grid two"><section class="panel"><div class="eyebrow">POLITICAL-FAMILY RESEARCH</div><h2 style="margin-top:6px">Relationship evidence stays explicit.</h2><p class="note" style="margin-top:8px">The alpha does not declare a “dynasty” from surname matching. Production joins should compare election cycles, offices, jurisdictions, dates, and documented family relationships.</p><div style="margin-top:16px">'+people().map((p,i)=>'<div class="person"><div class="avatar">'+(i+1)+'</div><div><strong>'+esc(p.name)+'</strong><span>'+esc(p.office||"Office not supplied")+' · '+esc(p.locality||"Locality not supplied")+'</span><small>'+esc(p.family_note||"Family relationship requires evidence review")+'</small></div></div>').join("")+'</div></section><section class="panel"><div class="eyebrow">JOIN POLICY</div><div class="grid" style="margin-top:10px"><div class="box"><div class="tiny">Lead</div><div class="big">Same surname</div><p>Candidate lead only. It does not prove kinship.</p></div><div class="box"><div class="tiny">Evidence</div><div class="big">Documented relationship</div><p>Use a source-backed relationship record or corroborated identifiers.</p></div></div></section></div>'}
-function correlations(){return '<section class="panel"><div class="eyebrow">CORRELATION WORKSPACE</div><h2 style="margin-top:6px">Explain the join before showing the lead.</h2><p class="note" style="margin-top:8px">The correlation engine should expose the exact shared key and both source records. Geography and timing can identify a research lead; they do not establish causation.</p><div class="grid cols boxes"><div class="box"><div class="tiny">Join key</div><div class="big">Jurisdiction</div><p>Same province, city, municipality, district, or project footprint.</p></div><div class="box"><div class="tiny">Join key</div><div class="big">Time overlap</div><p>Compare project dates with documented office-holder terms or roles.</p></div><div class="box"><div class="tiny">Join key</div><div class="big">Source trail</div><p>Show the project/person records and the documents supporting each edge.</p></div></div><div class="section"><h2>Planned edge types</h2></div><div class="grid cols"><div class="box"><div class="big">served_in</div><p>Person → office / election role.</p></div><div class="box"><div class="big">related_to</div><p>Person → person relationship backed by evidence.</p></div><div class="box"><div class="big">correlation_lead</div><p>Two records share an explainable join key and need review.</p></div></div></section>'}
-function render(){renderTabs();const root=document.querySelector("#app");if(state.tab==="overview")root.innerHTML=overview();else if(state.tab==="projects")root.innerHTML=projectsView();else if(state.tab==="dynasties")root.innerHTML=dynasties();else root.innerHTML=correlations();document.querySelectorAll("[data-project]").forEach(el=>el.onclick=()=>{state.selected=el.dataset.project;state.tab=state.tab==="overview"?"overview":"projects";render()})}
-async function init(){try{const r=await fetch("./data/seed.json",{cache:"no-store"});if(!r.ok)throw new Error("seed fetch failed");const d=await r.json();state.records=d.records||[];state.selected=projects()[0]?.id||null;render()}catch(e){document.querySelector("#app").innerHTML='<div class="panel error">The alpha seed could not be loaded. Run the site from a web server such as <code>python3 -m http.server 4173</code>, not directly from file://.</div>'}}
-document.querySelector("#q").addEventListener("input",e=>{state.query=e.target.value.trim();render()});document.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();document.querySelector("#q").focus()}});init();
+const seedProjects=()=>state.records.filter(r=>r.type==="project");
+const seedPeople=()=>state.records.filter(r=>r.type==="person");
+const textMatch=x=>[x.id,x.name,x.location,x.status,x.agency,x.signal,x.notes].join(" ").toLowerCase().includes(state.query.toLowerCase());
+const projects=()=>seedProjects().filter(textMatch);
+const pillClass=s=>String(s||"").toLowerCase().includes("suspend")?"warn":String(s||"").toLowerCase().includes("ongo")?"blue":"lead";
+
+function renderTabs(){
+  document.querySelector("#tabs").innerHTML=NAV.map(x=>'<button class="tab '+(state.tab===x[0]?"active":"")+'" data-tab="'+x[0]+'">'+x[1]+"</button>").join("");
+  document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{state.tab=b.dataset.tab;render()});
+}
+
+function projectCard(p){
+  return '<button class="card" data-project="'+esc(p.id)+'"><div class="cardtop"><span class="id">'+esc(p.id)+'</span><span class="pill '+pillClass(p.status)+'">'+esc(p.status)+'</span></div><h3>'+esc(p.name)+'</h3><div class="meta"><span>⌖ '+esc(p.location)+'</span><span>▣ '+esc(p.agency)+'</span></div><p>'+esc(p.signal)+'</p></button>';
+}
+
+function projectFallbackEvidence(p){
+  return (p.evidence||[]).map(e=>'<a href="'+esc(e.url)+'" target="_blank" rel="noreferrer" class="chainItem"><b>'+esc(e.title)+'</b><small>'+esc(e.class||"source")+' · '+esc(e.date||"date not supplied")+'</small></a>').join("");
+}
+
+function detailProject(){
+  const p=seedProjects().find(x=>x.id===state.selectedProject)||projects()[0];
+  if(!p)return '<section class="panel empty">No project matches this search.</section>';
+  state.selectedProject=p.id;
+  return '<section class="panel trace"><div class="traceHeader"><div><div class="eyebrow">SOURCE RECORD</div><h2>'+esc(p.id)+' · '+esc(p.name)+'</h2><p class="note small" style="margin-top:6px">'+esc(p.notes||p.signal||"Inspect the evidence trail.")+'</p></div><span class="pill '+pillClass(p.status)+'">'+esc(p.status)+'</span></div><div class="traceGrid"><div class="traceBlock"><div class="label">Published state</div><div class="value">'+esc(p.status)+'</div></div><div class="traceBlock"><div class="label">Agency</div><div class="value">'+esc(p.agency)+'</div></div><div class="traceBlock"><div class="label">Location</div><div class="value">'+esc(p.location)+'</div></div><div class="traceBlock"><div class="label">Source-native signal</div><div class="value">'+esc(p.signal)+'</div></div></div><div class="section"><h2>Evidence trail</h2><span class="muted small">'+((p.evidence||[]).length)+' seed source(s)</span></div><div class="chain">'+(projectFallbackEvidence(p)||'<div class="empty">No seed evidence links.</div>')+'</div></section>';
+}
+
+function overview(){
+  const ps=projects();
+  return '<div class="grid hero"><section class="panel"><div class="eyebrow">RESEARCH WORKSPACE</div><div class="heroTitle" style="margin-top:6px">A record graph where every lead can be traced backward.</div><p class="heroCopy">BantayLink separates source records, canonical identities, derived correlation leads, and the raw evidence that supports each one. The evidence UI is designed to make that chain visible instead of hiding it behind a single confidence score.</p><div class="stats"><div class="stat"><b>'+seedProjects().length+'</b><span>seed infrastructure records</span></div><div class="stat"><b>'+seedPeople().length+'</b><span>seed person records</span></div><div class="stat"><b>'+state.findings.length+'</b><span>correlation findings loaded</span></div><div class="stat"><b>'+((state.resolution?.candidates||[]).length)+'</b><span>identity candidates loaded</span></div></div></section><section class="panel"><div class="eyebrow">EVIDENCE DISCIPLINE</div><div class="grid" style="margin-top:12px"><div class="notice">A raw document is the retrieval artifact. An observation is the normalized source-backed state. An entity is the canonical record used for joins. A finding is derived and must point back to those underlying records.</div><div class="notice">Same-name person matches stay as research leads unless a stronger identity basis is available. PCAB identifiers can support organization identity where explicitly present.</div></div></section></div><div class="section"><h2>Infrastructure watch</h2><span class="muted">'+ps.length+' records</span></div><div class="cards">'+ps.slice(0,3).map(projectCard).join("")+'</div>'+detailProject();
+}
+
+function projectsView(){
+  const ps=projects();
+  return '<section class="panel"><div class="section" style="margin-top:0"><h2>Infrastructure records</h2><span class="muted">'+ps.length+' records</span></div>'+(ps.length?'<table class="table"><thead><tr><th>Project</th><th>Location</th><th>Status</th><th>Signal</th><th>Seed evidence</th></tr></thead><tbody>'+ps.map(p=>'<tr class="clickrow" data-project="'+esc(p.id)+'"><td><strong>'+esc(p.id)+'</strong><span>'+esc(p.name)+'</span></td><td>'+esc(p.location)+'</td><td><span class="pill '+pillClass(p.status)+'">'+esc(p.status)+'</span></td><td>'+esc(p.signal)+'</td><td>'+((p.evidence||[]).length)+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No project records match this search.</div>')+'</section>'+detailProject();
+}
+
+function resolutionView(){
+  const r=state.resolution;
+  if(!r)return '<section class="panel empty">Entity resolution data is not available. Provision DATABASE_URL and run the resolution engine.</section>';
+  const candidates=(r.candidates||[]).filter(c=>!state.query||JSON.stringify(c).toLowerCase().includes(state.query.toLowerCase()));
+  const rows=candidates.map(c=>{
+    const l=c.payload?.left||{}, rr=c.payload?.right||{};
+    return '<article class="resolutionCard"><div class="cardtop"><div><div class="eyebrow">'+esc(c.basis)+'</div><strong>'+esc(c.status)+'</strong></div><button class="tab" data-candidate="'+esc(c.id)+'">Trace evidence</button></div><div class="resolutionPair" style="margin-top:9px"><div class="identity"><div class="name">'+esc(l.name||l.normalizedName)+'</div><small>'+esc(l.sourceId||"source")+" · "+esc(l.sourceRecordId||"record")+'</small><small>'+esc(l.localityKey||l.year||"context not supplied")+'</small></div><div class="arrow">↔</div><div class="identity"><div class="name">'+esc(rr.name||rr.normalizedName)+'</div><small>'+esc(rr.sourceId||"source")+" · "+esc(rr.sourceRecordId||"record")+'</small><small>'+esc(rr.localityKey||rr.year||"context not supplied")+'</small></div></div><p class="muted small" style="margin:10px 0 0">'+esc(c.payload?.interpretationLimit||c.payload?.statement||"Review the identity basis and supporting documents.")+'</p></article>';
+  }).join("");
+  return '<div class="grid two"><section class="panel"><div class="section" style="margin-top:0"><h2>Identity candidates</h2><span class="muted">'+candidates.length+' shown</span></div>'+rows+'</section><section class="panel"><div class="eyebrow">RESOLUTION RUN</div><h2 style="margin-top:6px">'+esc(r.run?.engineVersion||"unknown")+'</h2><div class="traceGrid"><div class="traceBlock"><div class="label">Identity records</div><div class="value">'+esc(r.run?.identityRecordCount||0)+'</div></div><div class="traceBlock"><div class="label">Candidates</div><div class="value">'+esc(r.run?.candidateCount||0)+'</div></div><div class="traceBlock"><div class="label">Identifier resolutions</div><div class="value">'+esc(r.run?.verifiedIdentifierCount||0)+'</div></div><div class="traceBlock"><div class="label">Status</div><div class="value">'+esc(r.run?.status||"unknown")+'</div></div></div><div class="notice" style="margin-top:13px">Resolution is deliberately conservative. A candidate match is not a merged person record. Confirmed organization identities currently require an explicit identifier such as PCAB; person identity requires stronger evidence than name similarity.</div><div class="section"><h2>Resolved organizations</h2><span class="muted">'+((r.resolvedEntities||[]).length)+'</span></div>'+((r.resolvedEntities||[]).map(e=>'<div class="resolutionCard"><strong>'+esc(e.label)+'</strong><small class="muted" style="display:block;margin-top:4px">'+esc(e.canonicalKey)+' · '+esc(e.resolutionStatus)+'</small></div>').join("")||'<div class="empty">No identifier-backed organization records yet.</div>')+'</section></div>';
+}
+
+function findingPill(status){
+  return status==="VERIFIED_FACT"?"good":status==="INFERENCE_LEAD"?"lead":"warn";
+}
+
+function correlationsView(){
+  if(!state.findings.length)return '<section class="panel empty">No correlation findings loaded. The database-backed correlation endpoint may not be configured yet.</section>';
+  const fs=state.findings.filter(f=>!state.query||JSON.stringify(f).toLowerCase().includes(state.query.toLowerCase()));
+  const rows=fs.map(f=>'<tr class="clickrow" data-finding="'+esc(f.id)+'"><td><strong>'+esc(f.findingType)+'</strong><span>'+esc(f.ruleId)+'</span></td><td><span class="pill '+findingPill(f.status)+'">'+esc(f.status)+'</span></td><td>'+esc(f.payload?.statement||"Derived finding")+'</td><td>'+((f.evidenceObservationIds||[]).length)+' observation(s)</td></tr>').join("");
+  return '<section class="panel"><div class="section" style="margin-top:0"><h2>Derived findings</h2><span class="muted">'+fs.length+' shown</span></div><table class="table"><thead><tr><th>Type</th><th>Status</th><th>Interpretation</th><th>Evidence</th></tr></thead><tbody>'+rows+'</tbody></table></section>'+findingDetail();
+}
+
+function findingDetail(){
+  if(!state.selectedFinding)return "";
+  const f=state.findings.find(x=>x.id===state.selectedFinding);
+  if(!f)return "";
+  return '<section class="panel trace"><div class="traceHeader"><div><div class="eyebrow">DERIVED FINDING</div><h2>'+esc(f.findingType)+'</h2><p class="note small" style="margin-top:6px">'+esc(f.payload?.statement||"No statement supplied.")+'</p></div><span class="pill '+findingPill(f.status)+'">'+esc(f.status)+'</span></div><div class="traceGrid"><div class="traceBlock"><div class="label">Rule</div><div class="value">'+esc(f.ruleId)+'</div></div><div class="traceBlock"><div class="label">Fingerprint</div><div class="value hash">'+esc(f.fingerprint)+'</div></div><div class="traceBlock"><div class="label">Observation refs</div><div class="value">'+esc((f.evidenceObservationIds||[]).length)+'</div></div><div class="traceBlock"><div class="label">Edge refs</div><div class="value">'+esc((f.evidenceEdgeIds||[]).length)+'</div></div></div><div style="margin-top:13px"><button class="refresh" data-open-finding="'+esc(f.id)+'">Open evidence trail</button></div></section>';
+}
+
+function evidenceView(){
+  const e=state.evidence;
+  if(!e)return '<section class="panel empty">Select a project or finding and open its evidence trail.</section>';
+  const ent=(e.entities||[]).map(x=>'<div class="chainItem"><b>'+esc(x.label||x.canonicalKey)+'</b><small>'+esc(x.entityType)+' · '+esc(x.canonicalKey)+'</small></div>').join("");
+  const obs=(e.observations||[]).map(x=>'<div class="chainItem"><b>'+esc(x.recordType)+' · '+esc(x.sourceRecordId)+'</b><small>'+esc(x.sourceName||x.sourceId)+' · observed '+esc(x.observedAt||"unknown")+' · '+esc(x.sourceClass||"source")+'</small><small>content '+esc(x.contentHash)+' · repeated '+esc((e.observationOccurrences||[]).find(o=>o.observationId===x.id)?.runCount||1)+' run(s)</small></div>').join("");
+  const raw=(e.rawDocuments||[]).map(x=>'<details class="raw"><summary>'+esc(x.mimeType||"raw document")+' · '+esc(x.retrievedAt||"retrieved time unavailable")+'</summary><div class="chain"><div class="chainItem"><b>Retrieval</b><small>'+esc(x.retrievalUrl||x.canonicalUrl||"not supplied")+' · HTTP '+esc(x.httpStatus||"n/a")+'</small><small>sha256 · '+esc(x.contentHash)+' · scope '+esc(x.hashScope||"unknown")+'</small></div><pre>'+esc(typeof x.payload==="string"?x.payload:JSON.stringify(x.payload,null,2))+'</pre></div></details>').join("");
+  const edges=(e.edges||[]).map(x=>'<div class="chainItem"><b>'+esc(x.edgeType)+'</b><small>'+esc(x.fromEntityId)+' → '+esc(x.toEntityId)+' · '+esc(x.sourceName||x.sourceId)+'</small></div>').join("");
+  return '<section class="panel"><div class="eyebrow">EVIDENCE TRACE</div><h2 style="margin-top:5px">'+esc(e.finding?.findingType||"Source record")+'</h2>'+(e.finding?.payload?.interpretationLimit?'<div class="notice" style="margin-top:10px">'+esc(e.finding.payload.interpretationLimit)+'</div>':"")+'<div class="section"><h2>Entity</h2></div><div class="chain">'+(ent||'<div class="empty">No entity rows.</div>')+'</div><div class="section"><h2>Observations</h2></div><div class="chain">'+(obs||'<div class="empty">No observations.</div>')+'</div><div class="section"><h2>Raw retrievals</h2></div><div class="chain">'+(raw||'<div class="empty">No raw documents.</div>')+'</div><div class="section"><h2>Source-backed edges</h2></div><div class="chain">'+(edges||'<div class="empty">No edges attached to this trace.</div>')+'</div></section>';
+}
+
+function render(){
+  renderTabs();
+  const app=document.querySelector("#app");
+  if(state.loading){app.innerHTML='<div class="panel empty">Loading records…</div>';return}
+  if(state.error){app.innerHTML='<div class="panel error">'+esc(state.error)+'</div>';return}
+  if(state.tab==="overview")app.innerHTML=overview();
+  else if(state.tab==="projects")app.innerHTML=projectsView();
+  else if(state.tab==="resolution")app.innerHTML=resolutionView();
+  else if(state.tab==="correlations")app.innerHTML=correlationsView();
+  else app.innerHTML=evidenceView();
+
+  document.querySelectorAll("[data-project]").forEach(el=>el.onclick=async()=>{state.selectedProject=el.dataset.project;await loadEvidence({entityId:el.dataset.project});state.tab="evidence";render()});
+  document.querySelectorAll("[data-finding]").forEach(el=>el.onclick=()=>{state.selectedFinding=el.dataset.finding;state.tab="correlations";render()});
+  document.querySelectorAll("[data-open-finding]").forEach(el=>el.onclick=async()=>{await loadEvidence({findingId:el.dataset.openFinding});state.tab="evidence";render()});
+  document.querySelectorAll("[data-candidate]").forEach(el=>el.onclick=async()=>{const c=(state.resolution?.candidates||[]).find(x=>x.id===el.dataset.candidate);if(c&&c.evidenceObservationIds?.length)await loadEvidence({findingId:c.evidenceObservationIds[0]});state.tab="evidence";render()});
+}
+
+async function loadJson(url){
+  const r=await fetch(url,{cache:"no-store"});
+  if(!r.ok)throw new Error("HTTP "+r.status);
+  return r.json();
+}
+
+async function loadEvidence(query){
+  try{state.evidence=await loadJson("/api/evidence?"+new URLSearchParams(query));}
+  catch(e){state.evidence=null;state.error="The database evidence endpoint is not configured or could not be read."; }
+}
+
+async function load(){
+  state.loading=true;state.error=null;render();
+  try{
+    const seed=await loadJson("./data/seed.json");
+    state.records=seed.records||[];
+    try{const corr=await loadJson("/api/correlations?limit=100");state.findings=corr.findings||[];}catch{state.findings=[]}
+    try{state.resolution=await loadJson("/api/resolution?limit=100");}catch{state.resolution=null}
+    state.selectedProject=seedProjects()[0]?.id||null;
+  }catch(e){state.error="The seed dataset could not be loaded. Run BantayLink from a web server."}
+  state.loading=false;render();
+}
+document.querySelector("#q").addEventListener("input",e=>{state.query=e.target.value.trim();render()});
+document.querySelector("#refresh").onclick=load;
+document.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();document.querySelector("#q").focus()}});
+load();
 </script>
 </body>
 </html>
