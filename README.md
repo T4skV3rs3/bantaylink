@@ -24,12 +24,9 @@ Then open `http://localhost:4173`.
 
 ## Ingestion adapters
 
-Implemented: OpenHalalan winners/vote counts, DPWH Transparency project API, and a DPWH eFOI evidence-document fetcher for explicit URLs.
-
-Still planned/documented: DA SIDLAN, COA eLibrary, and PhilGEPS.
+Implemented: OpenHalalan winners/vote counts, DPWH Transparency project API and contract details, DPWH eFOI evidence documents, DA SIDLAN I-BUILD JSON ingestion, COA eLibrary explicit-document ingestion, and PhilGEPS Open Data JSON/CSV ingestion.
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md), [ADAPTERS.md](./ADAPTERS.md), and [SOURCES.md](./SOURCES.md).
-
 
 ## Correlation engine v0.5
 
@@ -51,6 +48,14 @@ After PostgreSQL is provisioned and `DATABASE_URL` is configured:
 node scripts/init-db.mjs
 BANTAYLINK_MAX_RECORDS=100 node scripts/ingest-source.mjs openhalalan-winners
 BANTAYLINK_MAX_RECORDS=100 node scripts/ingest-source.mjs dpwh-transparency
+```
+
+For the research sources:
+
+```bash
+SIDLAN_API_KEY=... BANTAYLINK_MAX_RECORDS=100 node scripts/ingest-source.mjs da-sidlan
+COA_ELIBRARY_URLS="https://elibrary.coa.gov.ph/resource/view/..." node scripts/ingest-source.mjs coa-elibrary
+PHILGEPS_OPEN_DATA_URLS="https://open.philgeps.gov.ph/..." node scripts/ingest-source.mjs philgeps
 ```
 
 OpenHalalan resolves and records the exact repository commit used for an ingestion run. Large vote-count ingestion is stream-parsed; use `BANTAYLINK_MAX_RECORDS` for bounded tests.
