@@ -271,13 +271,13 @@ assert(procurementLink.payload.path.some(step =>
   step.kind === "source_edge" && step.edgeType === "awarded_to"
 ));
 
-const procurementConflict = first.findings.find(finding =>
+const procurementConflictFinding = first.findings.find(finding =>
   finding.findingType === "PROJECT_PROCUREMENT_CONTRACTOR_CONFLICT"
 );
-assert(procurementConflict);
-assert.equal(procurementConflict.status, "VERIFIED_FACT");
-assert.equal(procurementConflict.payload.projectPcabId, "34698");
-assert.equal(procurementConflict.payload.procurementPcabId, "99999");
+assert(procurementConflictFinding);
+assert.equal(procurementConflictFinding.status, "VERIFIED_FACT");
+assert.equal(procurementConflictFinding.payload.projectPcabId, "34698");
+assert.equal(procurementConflictFinding.payload.procurementPcabId, "99999");
 
 assert(!first.findings.some(finding =>
   finding.findingType === "PROJECT_PROCUREMENT_LINK" &&
