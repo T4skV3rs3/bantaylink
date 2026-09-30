@@ -327,4 +327,4 @@ assert.equal(stored.engineVersion, CORRELATION_ENGINE_VERSION);
 assert.equal(stored.status, "completed");
 assert.equal(stored.truncated, true);
 
-console.log("Correlation engine v0.5 tests passed.");
+console.log("Correlation engine v0.6 tests passed.");
