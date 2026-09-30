@@ -14,6 +14,26 @@ export function createPool(connectionString = process.env.DATABASE_URL) {
   });
 }
 
+function mapRawDocument(row) {
+  return {
+    id: row.id,
+    ingestionRunId: row.ingestion_run_id,
+    sourceId: row.source_id,
+    canonicalUrl: row.canonical_url,
+    retrievalUrl: row.retrieval_url,
+    requestMethod: row.request_method,
+    responseHeaders: row.response_headers,
+    retrievedAt: row.retrieved_at,
+    httpStatus: row.http_status,
+    mimeType: row.mime_type,
+    payloadEncoding: row.payload_encoding,
+    hashAlgorithm: row.hash_algorithm,
+    hashScope: row.hash_scope,
+    contentHash: row.content_hash,
+    payload: row.payload
+  };
+}
+
 export function createPostgresStore(pool) {
   return {
     async upsertSource(source) {
@@ -34,13 +54,19 @@ export function createPostgresStore(pool) {
 
     async startRun(input) {
       const result = await pool.query(
-        `INSERT INTO ingestion_runs (id, adapter_id, source_id, source_version)
-         VALUES ($1,$2,$3,$4)
+        `INSERT INTO ingestion_runs (id, adapter_id, source_id, source_version, source_snapshot)
+         VALUES ($1,$2,$3,$4,$5::jsonb)
          RETURNING id, adapter_id AS "adapterId", source_id AS "sourceId",
-                   source_version AS "sourceVersion", status,
+                   source_version AS "sourceVersion", source_snapshot AS "sourceSnapshot", status,
                    records_seen AS "recordsSeen", records_inserted AS "recordsInserted",
                    records_updated AS "recordsUpdated", records_skipped AS "recordsSkipped", errors`,
-        [input.id, input.adapterId, input.sourceId, input.sourceVersion]
+        [
+          input.id,
+          input.adapterId,
+          input.sourceId,
+          input.sourceVersion ?? null,
+          JSON.stringify(input.sourceSnapshot ?? {})
+        ]
       );
       return result.rows[0];
     },
@@ -57,7 +83,7 @@ export function createPostgresStore(pool) {
              errors=$6::jsonb
          WHERE id=$1
          RETURNING id, adapter_id AS "adapterId", source_id AS "sourceId",
-                   source_version AS "sourceVersion", status,
+                   source_version AS "sourceVersion", source_snapshot AS "sourceSnapshot", status,
                    records_seen AS "recordsSeen", records_inserted AS "recordsInserted",
                    records_updated AS "recordsUpdated", records_skipped AS "recordsSkipped", errors`,
         [
@@ -72,18 +98,23 @@ export function createPostgresStore(pool) {
       return result.rows[0];
     },
 
-    async failRun(id, error) {
+    async failRun(id, error, errors = null) {
+      const value = errors ?? [{
+        stage: "run",
+        message: String(error?.message ?? error),
+        at: new Date().toISOString()
+      }];
       const result = await pool.query(
         `UPDATE ingestion_runs
          SET completed_at=NOW(),
              status='failed',
-             errors=errors || $2::jsonb
+             errors=$2::jsonb
          WHERE id=$1
          RETURNING id, adapter_id AS "adapterId", source_id AS "sourceId",
-                   source_version AS "sourceVersion", status,
+                   source_version AS "sourceVersion", source_snapshot AS "sourceSnapshot", status,
                    records_seen AS "recordsSeen", records_inserted AS "recordsInserted",
                    records_updated AS "recordsUpdated", records_skipped AS "recordsSkipped", errors`,
-        [id, JSON.stringify([String(error?.message ?? error)])]
+        [id, JSON.stringify(value)]
       );
       return result.rows[0];
     },
@@ -91,26 +122,32 @@ export function createPostgresStore(pool) {
     async insertRawDocument(doc) {
       const result = await pool.query(
         `INSERT INTO raw_documents
-          (id, ingestion_run_id, source_id, canonical_url, retrieved_at, http_status,
-           mime_type, content_hash, payload)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)
-         RETURNING id, ingestion_run_id AS "ingestionRunId", source_id AS "sourceId",
-                   canonical_url AS "canonicalUrl", retrieved_at AS "retrievedAt",
-                   http_status AS "httpStatus", mime_type AS "mimeType",
-                   content_hash AS "contentHash", payload`,
+          (id, ingestion_run_id, source_id, canonical_url, retrieval_url, request_method,
+           response_headers, retrieved_at, http_status, mime_type, payload_encoding,
+           hash_algorithm, hash_scope, content_hash, payload)
+         VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14,$15::jsonb)
+         RETURNING id, ingestion_run_id, source_id, canonical_url, retrieval_url, request_method,
+                   response_headers, retrieved_at, http_status, mime_type, payload_encoding,
+                   hash_algorithm, hash_scope, content_hash, payload`,
         [
           doc.id,
           doc.ingestionRunId,
           doc.sourceId,
-          doc.canonicalUrl,
+          doc.canonicalUrl ?? null,
+          doc.retrievalUrl ?? doc.canonicalUrl ?? null,
+          doc.requestMethod ?? "GET",
+          JSON.stringify(doc.responseHeaders ?? {}),
           doc.retrievedAt,
           doc.httpStatus,
           doc.mimeType,
+          doc.payloadEncoding ?? "jsonb",
+          doc.hashAlgorithm ?? "sha256",
+          doc.hashScope ?? "canonical_payload",
           doc.contentHash,
           JSON.stringify(doc.payload)
         ]
       );
-      return result.rows[0];
+      return mapRawDocument(result.rows[0]);
     },
 
     async upsertEntity(entity) {
@@ -135,7 +172,7 @@ export function createPostgresStore(pool) {
     },
 
     async insertObservation(observation) {
-      const result = await pool.query(
+      const inserted = await pool.query(
         `INSERT INTO observations
           (id,entity_id,source_id,ingestion_run_id,raw_document_id,record_type,
            source_record_id,observed_at,content_hash,data)
@@ -158,14 +195,38 @@ export function createPostgresStore(pool) {
           JSON.stringify(observation.data ?? {})
         ]
       );
-      return {
-        inserted: result.rowCount === 1,
-        observation: result.rows[0] ?? observation
-      };
+
+      if (inserted.rowCount === 1) {
+        return { inserted: true, observation: inserted.rows[0] };
+      }
+
+      const existing = await pool.query(
+        `SELECT id, entity_id AS "entityId", source_id AS "sourceId",
+                ingestion_run_id AS "ingestionRunId", raw_document_id AS "rawDocumentId",
+                record_type AS "recordType", source_record_id AS "sourceRecordId",
+                observed_at AS "observedAt", content_hash AS "contentHash", data
+         FROM observations
+         WHERE source_id=$1 AND source_record_id=$2 AND content_hash=$3`,
+        [observation.sourceId, observation.sourceRecordId, observation.contentHash]
+      );
+      if (!existing.rowCount) {
+        throw new Error("Observation conflict occurred but the existing observation could not be retrieved.");
+      }
+      return { inserted: false, observation: existing.rows[0] };
+    },
+
+    async linkObservationOccurrence(link) {
+      await pool.query(
+        `INSERT INTO observation_occurrences
+          (observation_id, ingestion_run_id, raw_document_id, seen_at)
+         VALUES ($1,$2,$3,$4)
+         ON CONFLICT (observation_id, ingestion_run_id, raw_document_id) DO NOTHING`,
+        [link.observationId, link.ingestionRunId, link.rawDocumentId, link.seenAt]
+      );
     },
 
     async insertEdge(edge) {
-      const result = await pool.query(
+      const inserted = await pool.query(
         `INSERT INTO edges
           (id,from_entity_id,to_entity_id,edge_type,source_id,ingestion_run_id,
            raw_document_id,source_record_id,observed_at,content_hash,data)
@@ -190,10 +251,35 @@ export function createPostgresStore(pool) {
           JSON.stringify(edge.data ?? {})
         ]
       );
-      return {
-        inserted: result.rowCount === 1,
-        edge: result.rows[0] ?? edge
-      };
+
+      if (inserted.rowCount === 1) {
+        return { inserted: true, edge: inserted.rows[0] };
+      }
+
+      const existing = await pool.query(
+        `SELECT id, from_entity_id AS "fromEntityId", to_entity_id AS "toEntityId",
+                edge_type AS "edgeType", source_id AS "sourceId",
+                ingestion_run_id AS "ingestionRunId", raw_document_id AS "rawDocumentId",
+                source_record_id AS "sourceRecordId", observed_at AS "observedAt",
+                content_hash AS "contentHash", data
+         FROM edges
+         WHERE source_id=$1 AND source_record_id=$2 AND content_hash=$3`,
+        [edge.sourceId, edge.sourceRecordId, edge.contentHash]
+      );
+      if (!existing.rowCount) {
+        throw new Error("Edge conflict occurred but the existing edge could not be retrieved.");
+      }
+      return { inserted: false, edge: existing.rows[0] };
+    },
+
+    async linkEdgeOccurrence(link) {
+      await pool.query(
+        `INSERT INTO edge_occurrences
+          (edge_id, ingestion_run_id, raw_document_id, seen_at)
+         VALUES ($1,$2,$3,$4)
+         ON CONFLICT (edge_id, ingestion_run_id, raw_document_id) DO NOTHING`,
+        [link.edgeId, link.ingestionRunId, link.rawDocumentId, link.seenAt]
+      );
     },
 
     async getCorrelationSnapshot() {
