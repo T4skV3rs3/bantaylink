@@ -356,6 +356,7 @@ function createElectionIndexes(elections) {
 function findElectionProjectPairs(snapshot) {
   const elections = electionEntities(snapshot);
   const projects = projectEntities(snapshot);
+  const entityById = new Map(snapshot.entities.map(entity => [entity.id, entity]));
   const indexes = createElectionIndexes(elections);
   const pairs = [];
 
@@ -389,7 +390,7 @@ function findElectionProjectPairs(snapshot) {
     }
 
     for (const [electionId, matchedYears] of matched) {
-      const election = snapshot.entities.find(entity => entity.id === electionId);
+      const election = entityById.get(electionId);
       if (!election) continue;
 
       const position = clean(election.data?.position).toUpperCase();
