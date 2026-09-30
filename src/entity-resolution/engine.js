@@ -41,6 +41,7 @@ export async function executeEntityResolutionRun({ store, maxCandidates } = {}) 
   if (!store?.getEntityResolutionSnapshot ||
       !store?.startEntityResolutionRun ||
       !store?.insertEntityResolutionCandidate ||
+      !store?.insertEntityResolutionAssertion ||
       !store?.completeEntityResolutionRun ||
       !store?.failEntityResolutionRun) {
     throw new Error("Entity-resolution store is missing required run/candidate methods.");
@@ -59,6 +60,23 @@ export async function executeEntityResolutionRun({ store, maxCandidates } = {}) 
 
     for (const item of result.candidates) {
       await store.insertEntityResolutionCandidate(runId, item);
+
+      if (item.status === "AUTO_CONFIRMED") {
+        await store.insertEntityResolutionAssertion({
+          id: runId + ":assertion:" + item.fingerprint,
+          sourceEntityId: item.sourceEntityId,
+          canonicalEntityId: item.candidateEntityId,
+          assertionType: "AUTO_CONFIRMED",
+          resolutionRunId: runId,
+          evidenceObservationIds: item.evidenceObservationIds,
+          evidenceEdgeIds: item.evidenceEdgeIds,
+          basis: {
+            matchMethod: item.matchMethod,
+            rationale: item.rationale,
+            fingerprint: item.fingerprint
+          }
+        });
+      }
     }
 
     return await store.completeEntityResolutionRun(runId, {
