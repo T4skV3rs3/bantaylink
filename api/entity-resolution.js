@@ -31,7 +31,8 @@ export default async function handler(req, res) {
               entity_count AS "entityCount", candidate_count AS "candidateCount",
               auto_confirmed_count AS "autoConfirmedCount",
               review_required_count AS "reviewRequiredCount",
-              conflict_count AS "conflictCount", errors
+              conflict_count AS "conflictCount",
+              cluster_count AS "clusterCount", errors
        FROM entity_resolution_runs
        WHERE status='completed'
        ORDER BY completed_at DESC
@@ -70,11 +71,24 @@ export default async function handler(req, res) {
       [run.id, status, matchMethod, limit]
     );
 
+    const clusters = await pool.query(
+      `SELECT id, entity_type AS "entityType", cluster_key AS "clusterKey",
+              representative_entity_id AS "representativeEntityId",
+              member_entity_ids AS "memberEntityIds",
+              status, basis, created_at AS "createdAt"
+       FROM entity_resolution_clusters
+       WHERE entity_resolution_run_id=$1
+       ORDER BY entity_type, cluster_key
+       LIMIT $2`,
+      [run.id, limit]
+    );
+
     return res.status(200).json({
       service: "bantaylink",
       status: "ok",
       run,
-      candidates: result.rows
+      candidates: result.rows,
+      clusters: clusters.rows
     });
   } catch {
     return res.status(503).json({
