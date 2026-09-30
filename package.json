@@ -1,6 +1,6 @@
 {
   "name": "bantaylink",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,6 +9,7 @@
     "test": "npm run test:ingestion && npm run test:adapters",
     "ingest:seed": "node scripts/ingest-seed.mjs",
     "ingest:source": "node scripts/ingest-source.mjs",
+    "correlate": "node scripts/run-correlation.mjs",
     "db:init": "node scripts/init-db.mjs"
   },
   "dependencies": {
