@@ -28,7 +28,8 @@ export default async function handler(req, res) {
       `SELECT id, engine_version AS "engineVersion", status,
               started_at AS "startedAt", completed_at AS "completedAt",
               entity_count AS "entityCount", observation_count AS "observationCount",
-              edge_count AS "edgeCount", finding_count AS "findingCount", errors
+              edge_count AS "edgeCount", finding_count AS "findingCount",
+              truncated, errors
        FROM correlation_runs
        WHERE status='completed'
        ORDER BY completed_at DESC
