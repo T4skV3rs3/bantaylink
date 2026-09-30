@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { parseCsv } from "../src/ingestion/csv.js";
 import { normalizeWinner, normalizeVote } from "../src/adapters/openhalalan.js";
 import { normalizeDpwhProject } from "../src/adapters/dpwh.js";
+import { normalizeSidlanIbuild } from "../src/adapters/da-sidlan.js";
+import { normalizeCoaElibraryDocument } from "../src/adapters/coa-elibrary.js";
+import { normalizePhilgepsRecord } from "../src/adapters/philgeps.js";
 
 const csv = 'Last Name,First Name,Full Name,Position,Year\nDOE,JOHN,"DOE, JOHN",MAYOR,2025\n';
 const parsed = parseCsv(csv);
@@ -59,5 +62,42 @@ assert.equal(project.entities[0].entityType, "project");
 assert.equal(project.entities[0].canonicalKey, "dpwh-contract:25AA0001");
 assert.deepEqual(project.entities[0].data.signals, ["suspended"]);
 assert.equal(project.entities[0].data.infraType, "Roads");
+
+const sidlan = normalizeSidlanIbuild({
+  sp_id: "IB-123",
+  sp_name: "Farm to Market Road",
+  region: "Region V",
+  province: "Camarines Norte",
+  municipality: "Daet",
+  awarded_cost: "1234567.89",
+  Physical_Progress: "42.5",
+  specific_status: "Construction"
+}, "hash-sidlan");
+assert.equal(sidlan.entities[0].entityType, "project");
+assert.equal(sidlan.entities[0].canonicalKey, "da-sidlan:ibuild:IB-123");
+assert.equal(sidlan.entities[0].data.awardedCost, 1234567.89);
+assert.equal(sidlan.entities[0].data.physicalProgress, 42.5);
+
+const coa = normalizeCoaElibraryDocument({
+  url: "https://elibrary.coa.gov.ph/resource/view/demo",
+  title: "Demo Annual Audit Report",
+  category: "Annual Audit Reports",
+  published: "2025",
+  documentId: "demo"
+});
+assert.equal(coa.entities[0].entityType, "source");
+assert.equal(coa.entities[0].observations[0].recordType, "official_document");
+
+const philgeps = normalizePhilgepsRecord({
+  "Reference Number": "ABC-123",
+  "Project Title": "Road repair",
+  "Procuring Entity": "Test LGU",
+  "Award Amount": "1,234,567.00",
+  "Awardee": "Test Builder"
+}, "hash-philgeps", "https://open.philgeps.gov.ph/data/example.csv");
+assert.equal(philgeps.entities[0].entityType, "procurement_event");
+assert.equal(philgeps.entities[0].canonicalKey, "philgeps:ABC-123");
+assert.equal(philgeps.entities[0].data.awardAmount, 1234567);
+assert.equal(philgeps.entities[0].data.awardee, "Test Builder");
 
 console.log("Adapter normalization checks passed.");
