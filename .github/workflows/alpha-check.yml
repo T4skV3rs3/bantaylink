@@ -48,13 +48,17 @@ jobs:
           test -f src/adapters/dpwh-efoi.js
           test -f scripts/test-adapters.mjs
           test -f scripts/ingest-source.mjs
+          test -f src/correlation/engine.js
+          test -f src/correlation/rules.js
+          test -f scripts/test-correlation.mjs
+          test -f scripts/run-correlation.mjs
 
       - name: Validate JSON
         run: |
           python3 -m json.tool data/schema.json >/dev/null
           python3 -m json.tool data/seed.json >/dev/null
 
-      - name: Test ingestion engine and adapters
+      - name: Test ingestion, adapters, and correlation engine
         run: npm test
 
       - name: Smoke-check UI anchors
