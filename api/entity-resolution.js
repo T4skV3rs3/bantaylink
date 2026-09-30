@@ -32,7 +32,8 @@ export default async function handler(req, res) {
               auto_confirmed_count AS "autoConfirmedCount",
               review_required_count AS "reviewRequiredCount",
               conflict_count AS "conflictCount",
-              cluster_count AS "clusterCount", errors
+              cluster_count AS "clusterCount",
+              truncated, errors
        FROM entity_resolution_runs
        WHERE status='completed'
        ORDER BY completed_at DESC
