@@ -23,7 +23,6 @@ function normalizeText(value) {
 export function normalizeName(value) {
   return normalizeText(value)
     .replace(/\b(HON|HONORABLE|ATTY|ATTORNEY|DR|MR|MS|MRS|ENGR|ENGINEER|GOV|GOVERNOR|MAYOR|VICE MAYOR|CONG|CONGRESSMAN|CONGRESSWOMAN|REP)\b/g, " ")
-    .replace(/\b(JR|SR|II|III|IV|V|VI)\b/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -371,7 +370,16 @@ export function resolveEntities(snapshot, { maxCandidates = 25000 } = {}) {
   const contractorNames = buildContractorNameIndex(entities);
   const candidates = [];
   const seen = new Set();
-  const push = addCandidateFactory(candidates, seen, maxCandidates);
+  let truncated = false;
+  const push = item => {
+    if (seen.has(item.fingerprint)) return;
+    if (candidates.length >= maxCandidates) {
+      truncated = true;
+      return;
+    }
+    seen.add(item.fingerprint);
+    candidates.push(item);
+  };
 
   for (const sourceEntity of entities) {
     const external = stableExternalId(sourceEntity);
