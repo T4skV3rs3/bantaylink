@@ -219,7 +219,7 @@ export function findProjectSourceDivergence(snapshot, observationIndex = createO
   const findings = [];
 
   for (const project of projectEntities(snapshot)) {
-    const observations = observationIndex.get(project.id) ?? [];
+    const observations = entityObservations(observationIndex, project.id, "project");
     const sourceIds = [...new Set(observations.map(obs => obs.sourceId))].sort();
     if (sourceIds.length < 2) continue;
 
@@ -447,8 +447,8 @@ export function findElectionProjectOverlaps(snapshot, observationIndex = createO
       subjectEntityId: election.id,
       relatedEntityIds: [project.id],
       evidenceObservationIds: [
-        ...(observationIndex.get(project.id) ?? []).map(obs => obs.id),
-        ...(observationIndex.get(election.id) ?? []).map(obs => obs.id)
+        ...entityObservations(observationIndex, project.id, "project").map(obs => obs.id),
+        ...entityObservations(observationIndex, election.id, "election_result").map(obs => obs.id)
       ],
       payload: {
         statement: "An election record and a project share a jurisdiction at the applicable office level and have an overlapping recorded year.",
