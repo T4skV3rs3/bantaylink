@@ -9,6 +9,7 @@ function truthy(value) {
 }
 
 export default async function handler(req, res) {
+  const query = new URL(req.url || "/", "https://bantaylink.invalid").searchParams;
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
     return res.status(405).json({ error: "Method not allowed." });
@@ -22,8 +23,8 @@ export default async function handler(req, res) {
     });
   }
 
-  const id = cleanId(req.query?.id);
-  const includeRaw = truthy(req.query?.includeRaw);
+  const id = cleanId(query.get("id"));
+  const includeRaw = truthy(query.get("includeRaw"));
   if (!id) return res.status(400).json({ error: "id is required." });
 
   const pool = createPool();
