@@ -177,7 +177,7 @@ CREATE OR REPLACE FUNCTION bantaylink_prevent_provenance_mutation()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog
-AS $
+AS $$
 BEGIN
   RAISE EXCEPTION 'BantayLink provenance table % is append-only; % is not permitted',
     TG_TABLE_NAME, TG_OP;
@@ -383,7 +383,7 @@ CREATE OR REPLACE FUNCTION bantaylink_prevent_resolution_assertion_mutation()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog
-AS $
+AS $$
 BEGIN
   RAISE EXCEPTION 'BantayLink resolution assertions are append-only; % is not permitted', TG_OP;
 END;
