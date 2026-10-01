@@ -19,8 +19,8 @@ export default async function handler(req, res) {
   const limit = Number.isFinite(parsedLimit)
     ? Math.min(Math.max(Math.floor(parsedLimit), 1), 250)
     : 50;
-  const ruleId = query.get("rule") ? String(req.query.rule) : null;
-  const status = query.get("status") ? String(req.query.status) : null;
+  const ruleId = query.get("rule") ? String(query.get("rule")) : null;
+  const status = query.get("status") ? String(query.get("status")) : null;
 
   const pool = createPool();
 
