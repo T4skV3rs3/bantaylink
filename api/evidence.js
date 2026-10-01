@@ -18,6 +18,7 @@ function truthy(value) {
 }
 
 export default async function handler(req, res) {
+  const query = new URL(req.url || "/", "https://bantaylink.invalid").searchParams;
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
     return res.status(405).json({ error: "Method not allowed." });
@@ -31,14 +32,14 @@ export default async function handler(req, res) {
     });
   }
 
-  const observationIdList = ids(req.query?.observationIds || req.query?.observations);
-  const edgeIdList = ids(req.query?.edgeIds || req.query?.edges);
-  const entityId = clean(req.query?.entityId);
-  const canonicalKey = clean(req.query?.canonicalKey);
-  const entityType = clean(req.query?.entityType, 50);
-  const findingId = clean(req.query?.findingId);
-  const candidateId = clean(req.query?.candidateId);
-  const includeRaw = truthy(req.query?.includeRaw);
+  const observationIdList = ids(query.get("observationIds") || query.get("observations"));
+  const edgeIdList = ids(query.get("edgeIds") || query.get("edges"));
+  const entityId = clean(query.get("entityId"));
+  const canonicalKey = clean(query.get("canonicalKey"));
+  const entityType = clean(query.get("entityType"), 50);
+  const findingId = clean(query.get("findingId"));
+  const candidateId = clean(query.get("candidateId"));
+  const includeRaw = truthy(query.get("includeRaw"));
 
   if (!observationIdList.length && !edgeIdList.length && !entityId && !canonicalKey && !findingId && !candidateId) {
     return res.status(400).json({
