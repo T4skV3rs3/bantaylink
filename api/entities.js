@@ -10,6 +10,7 @@ function normalizeLimit(value, fallback = 50) {
 }
 
 export default async function handler(req, res) {
+  const query = new URL(req.url || "/", "https://bantaylink.invalid").searchParams;
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
     return res.status(405).json({ error: "Method not allowed." });
@@ -23,9 +24,9 @@ export default async function handler(req, res) {
     });
   }
 
-  const q = cleanQuery(req.query?.q);
-  const type = cleanQuery(req.query?.type, 40);
-  const limit = normalizeLimit(req.query?.limit);
+  const q = cleanQuery(query.get("q"));
+  const type = cleanQuery(query.get("type"), 40);
+  const limit = normalizeLimit(query.get("limit"));
   const pool = createPool();
 
   try {
