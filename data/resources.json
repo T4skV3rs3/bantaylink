@@ -1,0 +1,199 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "checkedAt": "2026-10-04",
+    "note": "Curated public-source directory for research and verification. 'VERIFIED SOURCE' means the link and source identity were checked; it does not mean every claim found there is automatically true. Derived findings and unresolved leads remain separately labeled."
+  },
+  "resources": [
+    {
+      "id": "psa-psgc",
+      "category": "Geography",
+      "status": "VERIFIED_SOURCE",
+      "organization": "Philippine Statistics Authority",
+      "title": "Philippine Standard Geographic Code (PSGC)",
+      "description": "Official geographic classification for regions, provinces, cities, municipalities and barangays, with versioned releases and API documentation.",
+      "why": "Use PSGC codes as stable geographic keys before attaching BantayLink records to places.",
+      "links": [
+        [
+          "PSGC database",
+          "https://psa.gov.ph/classification/psgc"
+        ],
+        [
+          "PSGC API documentation",
+          "https://psa.gov.ph/classifications-api/psgc"
+        ]
+      ]
+    },
+    {
+      "id": "dpwh-transparency",
+      "category": "Infrastructure",
+      "status": "VERIFIED_SOURCE",
+      "organization": "Department of Public Works and Highways",
+      "title": "DPWH Transparency Portal",
+      "description": "Public portal for DPWH contracts with search by contract name, location or contractor, plus cost, accomplishment and completion information.",
+      "why": "Primary place to cross-check project identity, contractor, cost and reported accomplishment.",
+      "links": [
+        [
+          "Transparency Portal",
+          "https://transparency.dpwh.gov.ph/"
+        ]
+      ]
+    },
+    {
+      "id": "dpwh-efoi",
+      "category": "FOI / Evidence",
+      "status": "VERIFIED_SOURCE",
+      "organization": "eFOI / Department of Public Works and Highways",
+      "title": "DPWH eFOI records",
+      "description": "Publicly viewable Freedom of Information request threads and agency responses.",
+      "why": "Useful for primary-source clarifications that may resolve conflicting project-status or document questions.",
+      "links": [
+        [
+          "eFOI portal",
+          "https://www.foi.gov.ph/"
+        ],
+        [
+          "Example: Status of listed DPWH Project",
+          "https://www.foi.gov.ph/agencies/dpwh/status-of-listed-dpwh-project/"
+        ],
+        [
+          "Example: Project Status Clarification",
+          "https://www.foi.gov.ph/agencies/dpwh/project-status-clarification/"
+        ]
+      ]
+    },
+    {
+      "id": "coa-audit",
+      "category": "Audit",
+      "status": "VERIFIED_SOURCE",
+      "organization": "Commission on Audit",
+      "title": "COA Audit Reports",
+      "description": "Official audit-report material covering annual, consolidated, management, financial, compliance and performance audit work.",
+      "why": "Use audit reports to verify findings, recommendations and government-accountability records rather than treating an analytical flag as an audit conclusion.",
+      "links": [
+        [
+          "COA overview and audit reports",
+          "https://coa.gov.ph/coa_at_a_glance/"
+        ]
+      ]
+    },
+    {
+      "id": "gppb",
+      "category": "Procurement",
+      "status": "VERIFIED_SOURCE",
+      "organization": "Government Procurement Policy Board",
+      "title": "GPPB issuances and resolutions",
+      "description": "Official procurement policy, resolutions, circulars and guidance under the New Government Procurement Act.",
+      "why": "Provides the policy basis needed to interpret procurement records correctly.",
+      "links": [
+        [
+          "GPPB resolutions",
+          "https://www.gppb.gov.ph/resolutions/"
+        ],
+        [
+          "GPPB functions",
+          "https://www.gppb.gov.ph/gppb-functions/"
+        ],
+        [
+          "2026 procurement documentary-guidelines circular",
+          "https://www.gppb.gov.ph/wp-content/uploads/2026/06/Annex-A-Circular-No.-06-2026.pdf"
+        ]
+      ]
+    },
+    {
+      "id": "philgeps",
+      "category": "Procurement",
+      "status": "VERIFIED_SOURCE",
+      "organization": "PS-DBM / PhilGEPS",
+      "title": "PhilGEPS procurement notices",
+      "description": "Official procurement-service pages containing Notices of Award, Notices to Proceed and related procurement documents.",
+      "why": "Cross-check award and proceeding stages when a contractor or procurement relationship appears in BantayLink.",
+      "links": [
+        [
+          "Notice of Award",
+          "https://www.ps-philgeps.gov.ph/home/index.php/bid-opportunities/notice-of-award-2"
+        ],
+        [
+          "Notice to Proceed",
+          "https://ps-philgeps.gov.ph/home/index.php/bid-opportunities/notice-to-proceed"
+        ]
+      ]
+    },
+    {
+      "id": "da-sidlan",
+      "category": "Infrastructure",
+      "status": "VERIFIED_SOURCE",
+      "organization": "Department of Agriculture",
+      "title": "SIDLAN infrastructure API",
+      "description": "DA SIDLAN provides API access to I-BUILD infrastructure subproject datasets, including project identifiers, locations, costs, stage and progress fields.",
+      "why": "Machine-readable source for DA infrastructure records and geographic project joins.",
+      "links": [
+        [
+          "SIDLAN API",
+          "https://sidlan.da.gov.ph/api/index"
+        ]
+      ]
+    },
+    {
+      "id": "comelec",
+      "category": "Elections",
+      "status": "VERIFIED_SOURCE",
+      "organization": "Commission on Elections",
+      "title": "COMELEC election records and transparency materials",
+      "description": "Official COMELEC issuances and election-data documentation used to anchor election-related research.",
+      "why": "Primary source for election rules, official election materials and election-data provenance.",
+      "links": [
+        [
+          "COMELEC Transparency Seal",
+          "https://www.comelec.gov.ph/?r=TransparencySeal"
+        ],
+        [
+          "Example: Resolution 11087 on access to election-results data",
+          "https://www.comelec.gov.ph/?r=2025NLE%2FResolutions%2Fres11087"
+        ]
+      ]
+    },
+    {
+      "id": "foi-policy",
+      "category": "FOI / Method",
+      "status": "VERIFIED_SOURCE",
+      "organization": "Freedom of Information Program",
+      "title": "FOI policies and Executive Order No. 2",
+      "description": "Official policy resources covering the Executive Branch Freedom of Information framework and exceptions.",
+      "why": "Helps researchers understand what an FOI record is, how it was requested, and the limits on interpreting it.",
+      "links": [
+        [
+          "FOI policy resources",
+          "https://www.foi.gov.ph/resources/policies/"
+        ],
+        [
+          "Executive Order No. 2, s. 2016",
+          "https://www.foi.gov.ph/documentview/view/executive-order-no-2-series-2016/"
+        ]
+      ]
+    },
+    {
+      "id": "openhalalan",
+      "category": "Elections",
+      "status": "SECONDARY_SOURCE_REVIEW",
+      "organization": "OpenHalalan",
+      "title": "OpenHalalan election datasets",
+      "description": "Independent, reproducible Philippine election-result datasets with documented provenance, coverage notes and known gaps.",
+      "why": "Useful for research and discovery, but individual records should be checked against the underlying official COMELEC material before being treated as settled fact.",
+      "links": [
+        [
+          "Project README / provenance",
+          "https://github.com/RobertRLeung/OpenHalalan"
+        ],
+        [
+          "Winners data dictionary",
+          "https://github.com/RobertRLeung/OpenHalalan/blob/main/data/output/DATA_DICTIONARY_WINNERS.md"
+        ],
+        [
+          "Vote-counts data dictionary",
+          "https://github.com/RobertRLeung/OpenHalalan/blob/main/data/output/DATA_DICTIONARY_VOTE_COUNTS.md"
+        ]
+      ]
+    }
+  ]
+}
